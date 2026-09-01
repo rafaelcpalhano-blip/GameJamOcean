@@ -115,3 +115,5 @@ InitTestScene*.unity*
 
 # Reference artwork kept outside version control for licensing/copyright safety
 /Artes/
+/Assets/Artes/
+/Assets/Artes.meta
