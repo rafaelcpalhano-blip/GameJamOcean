@@ -117,3 +117,11 @@ InitTestScene*.unity*
 /Artes/
 /Assets/Artes/
 /Assets/Artes.meta
+
+# Third-party art packages kept local for licensing/copyright safety
+/Assets/2D-Ocean theme Parallax Background/
+/Assets/2D-Ocean theme Parallax Background.meta
+/Assets/LifeguardBuoy/
+/Assets/LifeguardBuoy.meta
+/Assets/Tiny Swords/
+/Assets/Tiny Swords.meta
