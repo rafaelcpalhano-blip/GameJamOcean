@@ -97,6 +97,11 @@ namespace GameJamOcean.Player
         {
             moveInput = Vector2.zero;
 
+            if (diverRigidbody != null)
+            {
+                diverRigidbody.linearVelocity = Vector2.zero;
+            }
+
             if (enabledMoveAction && moveAction != null)
             {
                 moveAction.action.Disable();
