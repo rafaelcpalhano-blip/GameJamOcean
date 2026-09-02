@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using GameJamOcean.World;
 
 namespace GameJamOcean.Player
 {
@@ -19,6 +20,10 @@ namespace GameJamOcean.Player
         [SerializeField, Min(0f)] private float acceleration = 10f;
         [SerializeField, Min(0f)] private float deceleration = 14f;
 
+        [Header("Movement Bounds")]
+        [SerializeField] private MovementBounds2D movementBounds;
+        [SerializeField, Min(0f)] private float boundsPadding = 0.05f;
+
         [Header("Animation")]
         [SerializeField] private Animator animator;
         [SerializeField] private SpriteRenderer spriteRenderer;
@@ -30,6 +35,7 @@ namespace GameJamOcean.Player
         [SerializeField, Min(0f)] private float animationSpeedChange = 4f;
 
         private Rigidbody2D diverRigidbody;
+        private Collider2D diverCollider;
         private Vector2 moveInput;
         private bool enabledMoveAction;
         private int upStateHash;
@@ -40,6 +46,12 @@ namespace GameJamOcean.Player
         private void Awake()
         {
             diverRigidbody = GetComponent<Rigidbody2D>();
+            diverCollider = GetComponent<Collider2D>();
+
+            if (movementBounds == null)
+            {
+                movementBounds = FindFirstObjectByType<MovementBounds2D>();
+            }
 
             if (animator == null)
             {
@@ -110,6 +122,38 @@ namespace GameJamOcean.Player
                 diverRigidbody.linearVelocity,
                 desiredVelocity,
                 speedChange * Time.fixedDeltaTime);
+
+            ApplyMovementBounds();
+        }
+
+        private void ApplyMovementBounds()
+        {
+            if (movementBounds == null)
+            {
+                return;
+            }
+
+            Vector2 currentPosition = diverRigidbody.position;
+            Vector2 extents = diverCollider != null
+                ? (Vector2)diverCollider.bounds.extents
+                : Vector2.zero;
+            extents += Vector2.one * boundsPadding;
+
+            Vector2 clampedPosition = movementBounds.ClampPoint(currentPosition, extents);
+            Vector2 velocity = diverRigidbody.linearVelocity;
+
+            if (!Mathf.Approximately(currentPosition.x, clampedPosition.x))
+            {
+                velocity.x = 0f;
+            }
+
+            if (!Mathf.Approximately(currentPosition.y, clampedPosition.y))
+            {
+                velocity.y = 0f;
+            }
+
+            diverRigidbody.position = clampedPosition;
+            diverRigidbody.linearVelocity = velocity;
         }
 
         private void UpdateAnimation()
@@ -165,6 +209,7 @@ namespace GameJamOcean.Player
             deceleration = Mathf.Max(0f, deceleration);
             transitionDuration = Mathf.Max(0f, transitionDuration);
             animationSpeedChange = Mathf.Max(0f, animationSpeedChange);
+            boundsPadding = Mathf.Max(0f, boundsPadding);
         }
     }
 }

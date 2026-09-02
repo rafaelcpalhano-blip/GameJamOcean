@@ -1,4 +1,5 @@
 using UnityEngine;
+using GameJamOcean.World;
 
 namespace GameJamOcean.CameraSystem
 {
@@ -15,12 +16,23 @@ namespace GameJamOcean.CameraSystem
         [SerializeField, Min(0f)] private float maximumSpeed = 30f;
         [SerializeField] private bool snapOnEnable = true;
 
+        [Header("Movement Bounds")]
+        [SerializeField] private MovementBounds2D movementBounds;
+        [SerializeField, Min(0f)] private float boundsPadding = 0.1f;
+
         private Vector3 followVelocity;
         private float cameraDepth;
+        private Camera followCamera;
 
         private void Awake()
         {
             cameraDepth = transform.position.z;
+            followCamera = GetComponent<Camera>();
+
+            if (movementBounds == null)
+            {
+                movementBounds = FindFirstObjectByType<MovementBounds2D>();
+            }
         }
 
         private void OnEnable()
@@ -58,16 +70,33 @@ namespace GameJamOcean.CameraSystem
 
         private Vector3 GetDesiredPosition()
         {
-            return new Vector3(
+            Vector3 desiredPosition = new(
                 target.position.x + offset.x,
                 target.position.y + offset.y,
                 cameraDepth);
+
+            if (movementBounds == null || followCamera == null || !followCamera.orthographic)
+            {
+                return desiredPosition;
+            }
+
+            float halfHeight = followCamera.orthographicSize;
+            float halfWidth = halfHeight * followCamera.aspect;
+            Vector2 cameraExtents = new(
+                halfWidth + boundsPadding,
+                halfHeight + boundsPadding);
+            Vector2 clampedPosition = movementBounds.ClampPoint(desiredPosition, cameraExtents);
+
+            desiredPosition.x = clampedPosition.x;
+            desiredPosition.y = clampedPosition.y;
+            return desiredPosition;
         }
 
         private void OnValidate()
         {
             smoothTime = Mathf.Max(0f, smoothTime);
             maximumSpeed = Mathf.Max(0f, maximumSpeed);
+            boundsPadding = Mathf.Max(0f, boundsPadding);
         }
     }
 }
