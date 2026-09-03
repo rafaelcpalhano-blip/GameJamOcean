@@ -1,3 +1,4 @@
+using System.Collections;
 using GameJamOcean.Diving;
 using GameJamOcean.Interaction;
 using GameJamOcean.Player;
@@ -183,8 +184,27 @@ namespace GameJamOcean.Rewards
 
             if (destroyAfterOpening)
             {
-                Destroy(gameObject, destroyDelay);
+                StartCoroutine(DestroyAfterDelay());
             }
+        }
+
+        private IEnumerator DestroyAfterDelay()
+        {
+            if (destroyDelay > 0f)
+            {
+                yield return new WaitForSeconds(destroyDelay);
+            }
+
+#if UNITY_EDITOR
+            GameObject selectedObject = UnityEditor.Selection.activeGameObject;
+            if (selectedObject != null
+                && (selectedObject == gameObject || selectedObject.transform.IsChildOf(transform)))
+            {
+                UnityEditor.Selection.activeObject = null;
+            }
+#endif
+
+            Destroy(gameObject);
         }
 
         private void FindReferencesIfNeeded()

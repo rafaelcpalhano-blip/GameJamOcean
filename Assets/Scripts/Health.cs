@@ -18,6 +18,7 @@ namespace GameJamOcean.Combat
 
         public event Action<Health, GameObject> Damaged;
         public event Action<Health, GameObject> Died;
+        public event Action<Health> HealthChanged;
 
         public float CurrentHealth => currentHealth;
         public float MaximumHealth => maximumHealth;
@@ -44,6 +45,7 @@ namespace GameJamOcean.Combat
             }
 
             currentHealth = Mathf.Max(0f, currentHealth - amount);
+            HealthChanged?.Invoke(this);
             onDamaged?.Invoke();
             Damaged?.Invoke(this, source);
 
@@ -65,12 +67,29 @@ namespace GameJamOcean.Combat
             }
 
             currentHealth = Mathf.Min(maximumHealth, currentHealth + amount);
+            HealthChanged?.Invoke(this);
+        }
+
+        public void SetMaximumHealth(float value, bool restoreToFull = false)
+        {
+            maximumHealth = Mathf.Max(1f, value);
+            currentHealth = restoreToFull
+                ? maximumHealth
+                : Mathf.Min(currentHealth, maximumHealth);
+
+            if (restoreToFull)
+            {
+                IsDead = false;
+            }
+
+            HealthChanged?.Invoke(this);
         }
 
         public void Restore()
         {
             currentHealth = maximumHealth;
             IsDead = false;
+            HealthChanged?.Invoke(this);
         }
 
         private void OnValidate()

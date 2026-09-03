@@ -89,7 +89,7 @@ namespace GameJamOcean.Flow
             }
 
             completedSuccessfully = false;
-            committedGold = sessionManager.SecuredGold;
+            committedGold = sessionManager.SecuredGold + sessionManager.CollectedCoinGold;
             FinishSession(defeatReturnDelay);
         }
 
@@ -114,6 +114,10 @@ namespace GameJamOcean.Flow
                 transitioning = false;
                 yield break;
             }
+
+#if UNITY_EDITOR
+            UnityEditor.Selection.activeObject = null;
+#endif
 
             SceneManager.LoadScene(oceanSceneName);
         }

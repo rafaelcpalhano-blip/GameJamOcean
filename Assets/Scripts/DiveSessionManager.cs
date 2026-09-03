@@ -41,6 +41,7 @@ namespace GameJamOcean.Diving
         [Header("Runtime - Rewards")]
         [SerializeField] private int releasedChests;
         [SerializeField] private int securedGold;
+        [SerializeField] private int collectedCoinGold;
         [SerializeField] private int finalRewardGold;
 
         [Header("Runtime - State")]
@@ -52,12 +53,16 @@ namespace GameJamOcean.Diving
         [SerializeField] private UnityEvent<float> onCompletionPercentageChanged;
         [SerializeField] private UnityEvent<float> onChestMilestoneReached;
         [SerializeField] private UnityEvent<int> onSecuredGoldChanged;
+        [SerializeField] private UnityEvent<int> onCollectedCoinGoldChanged;
         [SerializeField] private UnityEvent<int> onFinalRewardGoldChanged;
         [SerializeField] private UnityEvent onAllEnemiesDefeated;
         [SerializeField] private UnityEvent onVictory;
         [SerializeField] private UnityEvent onDefeat;
 
         public event Action<float> ChestMilestoneReached;
+        public event Action<int> SecuredGoldChanged;
+        public event Action<int> CollectedCoinGoldChanged;
+        public event Action<float> CompletionPercentageChanged;
         public event Action SessionStarted;
         public event Action SessionWon;
         public event Action SessionLost;
@@ -70,8 +75,9 @@ namespace GameJamOcean.Diving
         public int RemainingEnemiesToSpawn => Mathf.Max(0, totalEnemies - spawnedEnemies);
         public int ReleasedChests => releasedChests;
         public int SecuredGold => securedGold;
+        public int CollectedCoinGold => collectedCoinGold;
         public int FinalRewardGold => finalRewardGold;
-        public int TotalCollectedGold => securedGold + finalRewardGold;
+        public int TotalCollectedGold => securedGold + collectedCoinGold + finalRewardGold;
         public float CompletionPercentage => completionPercentage;
         public DiveSessionState SessionState => sessionState;
         public bool CanSpawnEnemy => sessionState == DiveSessionState.Running && spawnedEnemies < totalEnemies;
@@ -125,6 +131,7 @@ namespace GameJamOcean.Diving
             completionPercentage = 0f;
             releasedChests = 0;
             securedGold = 0;
+            collectedCoinGold = 0;
             finalRewardGold = 0;
             releasedMilestones = new bool[chestMilestones.Count];
             sessionState = DiveSessionState.Running;
@@ -171,6 +178,20 @@ namespace GameJamOcean.Diving
 
             securedGold += amount;
             onSecuredGoldChanged?.Invoke(securedGold);
+            SecuredGoldChanged?.Invoke(securedGold);
+        }
+
+        public void AddCollectedCoinGold(int amount = 1)
+        {
+            if (amount <= 0
+                || sessionState is DiveSessionState.NotStarted or DiveSessionState.Lost or DiveSessionState.Won)
+            {
+                return;
+            }
+
+            collectedCoinGold += amount;
+            onCollectedCoinGoldChanged?.Invoke(collectedCoinGold);
+            CollectedCoinGoldChanged?.Invoke(collectedCoinGold);
         }
 
         public void CollectFinalChest(int goldAmount)
@@ -253,6 +274,7 @@ namespace GameJamOcean.Diving
         {
             onEnemyProgressChanged?.Invoke(killedEnemies, totalEnemies);
             onCompletionPercentageChanged?.Invoke(completionPercentage);
+            CompletionPercentageChanged?.Invoke(completionPercentage);
         }
 
         private void HandlePlayerDied(Health health, GameObject source)

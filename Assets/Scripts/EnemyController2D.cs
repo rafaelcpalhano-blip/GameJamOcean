@@ -1,11 +1,19 @@
 using System;
+using System.Collections;
 using GameJamOcean.Combat;
 using GameJamOcean.Player;
+using GameJamOcean.Weapons;
 using UnityEngine;
 using UnityEngine.Events;
 
 namespace GameJamOcean.Enemies
 {
+    public enum EnemyAttackType
+    {
+        Melee,
+        Projectile
+    }
+
     [DisallowMultipleComponent]
     [RequireComponent(typeof(Rigidbody2D))]
     [RequireComponent(typeof(Health))]
@@ -19,11 +27,17 @@ namespace GameJamOcean.Enemies
         [SerializeField, Min(0f)] private float stoppingDistance = 0.65f;
 
         [Header("Attack")]
+        [SerializeField] private EnemyAttackType attackType = EnemyAttackType.Melee;
         [SerializeField, Min(0f)] private float attackRange = 0.8f;
         [SerializeField, Min(0f)] private float attackDamage = 1f;
         [SerializeField, Min(0.01f)] private float attackCooldown = 1.25f;
         [SerializeField] private UnityEvent onAttack;
         [SerializeField] private UnityEvent onEnemyDied;
+
+        [Header("Projectile Attack")]
+        [SerializeField] private EnemyProjectile2D projectilePrefab;
+        [SerializeField] private Transform projectileSpawnPoint;
+        [SerializeField, Min(0f)] private float projectileReleaseDelay = 0.2f;
 
         [Header("Animation")]
         [SerializeField] private Animator animator;
@@ -144,7 +158,37 @@ namespace GameJamOcean.Enemies
             nextAttackTime = Time.time + attackCooldown;
             PlayActionAnimation(attackStateHash, attackAnimationDuration);
             onAttack?.Invoke();
+
+            if (attackType == EnemyAttackType.Projectile)
+            {
+                Vector2 direction = ((Vector2)target.position - enemyRigidbody.position).normalized;
+                StartCoroutine(LaunchProjectileAfterDelay(direction));
+                return;
+            }
+
             targetHealth.TakeDamage(attackDamage, gameObject);
+        }
+
+        private IEnumerator LaunchProjectileAfterDelay(Vector2 direction)
+        {
+            if (projectileReleaseDelay > 0f)
+            {
+                yield return new WaitForSeconds(projectileReleaseDelay);
+            }
+
+            if (enemyHealth.IsDead || projectilePrefab == null || targetHealth == null || targetHealth.IsDead)
+            {
+                yield break;
+            }
+
+            Vector2 origin = projectileSpawnPoint != null
+                ? projectileSpawnPoint.position
+                : transform.position;
+            EnemyProjectile2D projectile = Instantiate(
+                projectilePrefab,
+                origin,
+                Quaternion.identity);
+            projectile.Launch(direction, targetHealth, gameObject, attackDamage);
         }
 
         private void UpdateMovementAnimation()
@@ -266,6 +310,7 @@ namespace GameJamOcean.Enemies
             transitionDuration = Mathf.Max(0f, transitionDuration);
             attackAnimationDuration = Mathf.Max(0f, attackAnimationDuration);
             hurtAnimationDuration = Mathf.Max(0f, hurtAnimationDuration);
+            projectileReleaseDelay = Mathf.Max(0f, projectileReleaseDelay);
             destroyDelay = Mathf.Max(0f, destroyDelay);
 
             CacheAnimationHashes();
