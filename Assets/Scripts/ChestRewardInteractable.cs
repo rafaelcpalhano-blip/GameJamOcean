@@ -37,6 +37,9 @@ namespace GameJamOcean.Rewards
         [SerializeField] private Camera interactionCamera;
         [SerializeField] private Transform player;
 
+        [Header("Interaction Prompt")]
+        [SerializeField] private Vector3 promptOffset = new(0f, 0.25f, 0f);
+
         [Header("Animation")]
         [SerializeField] private Animator animator;
         [SerializeField] private string openTriggerName = "Open";
@@ -72,6 +75,7 @@ namespace GameJamOcean.Rewards
             }
 
             FindReferencesIfNeeded();
+            ConfigurePromptTarget();
         }
 
         private void OnEnable()
@@ -227,6 +231,20 @@ namespace GameJamOcean.Rewards
                     player = diver.transform;
                 }
             }
+        }
+
+        private void ConfigurePromptTarget()
+        {
+            InteractionPromptTarget2D target = GetComponent<InteractionPromptTarget2D>();
+            if (target == null)
+            {
+                target = gameObject.AddComponent<InteractionPromptTarget2D>();
+            }
+
+            string discoveryKey = chestType == ChestRewardType.Final
+                ? "FinalChest"
+                : "SmallChest";
+            target.Configure(this, discoveryKey, promptOffset);
         }
 
         private bool HasTriggerParameter(string parameterName)

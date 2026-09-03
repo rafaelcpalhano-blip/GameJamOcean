@@ -11,9 +11,18 @@ namespace GameJamOcean.Interaction
         [SerializeField] private string sceneName = "DiveScene";
         [SerializeField] private bool available = true;
 
+        [Header("Interaction Prompt")]
+        [SerializeField] private string discoveryKey = "DiveBuoy";
+        [SerializeField] private Vector3 promptOffset = new(0f, 0.25f, 0f);
+
         private bool isLoading;
 
         public string Prompt => prompt;
+
+        private void Awake()
+        {
+            ConfigurePromptTarget();
+        }
 
         public bool CanInteract(GameObject interactor)
         {
@@ -43,6 +52,17 @@ namespace GameJamOcean.Interaction
         public void SetAvailable(bool value)
         {
             available = value;
+        }
+
+        private void ConfigurePromptTarget()
+        {
+            InteractionPromptTarget2D target = GetComponent<InteractionPromptTarget2D>();
+            if (target == null)
+            {
+                target = gameObject.AddComponent<InteractionPromptTarget2D>();
+            }
+
+            target.Configure(this, discoveryKey, promptOffset);
         }
 
         private void OnValidate()

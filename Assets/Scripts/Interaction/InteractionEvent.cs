@@ -12,11 +12,26 @@ namespace GameJamOcean.Interaction
         [SerializeField] private bool available = true;
         [SerializeField] private bool oneShot;
 
+        [Header("Interaction Prompt")]
+        [SerializeField] private string discoveryKey = "GenericInteraction";
+        [SerializeField] private Vector3 promptOffset = new(0f, 0.25f, 0f);
+
         [Header("Response")]
         [SerializeField] private bool logInteraction = true;
         [SerializeField] private UnityEvent onInteracted = new();
 
         public string Prompt => prompt;
+
+        private void Awake()
+        {
+            InteractionPromptTarget2D target = GetComponent<InteractionPromptTarget2D>();
+            if (target == null)
+            {
+                target = gameObject.AddComponent<InteractionPromptTarget2D>();
+            }
+
+            target.Configure(this, discoveryKey, promptOffset);
+        }
 
         public bool CanInteract(GameObject interactor)
         {
