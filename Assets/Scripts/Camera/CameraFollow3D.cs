@@ -1,4 +1,7 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
+using GameJamOcean.Boat;
 
 namespace GameJamOcean.CameraSystem
 {
@@ -19,6 +22,20 @@ namespace GameJamOcean.CameraSystem
         [SerializeField, Min(0.01f)] private float headingSmoothTime = 1.1f;
         [SerializeField, Min(1f)] private float maximumHeadingSpeed = 45f;
 
+        [Header("Right Mouse Orbit (Boat)")]
+        [SerializeField] private bool enableMouseOrbit = true;
+        [Tooltip("Degrees per pixel of horizontal mouse movement.")]
+        [SerializeField, Range(0.01f, 0.5f)] private float mouseOrbitSensitivity = 0.12f;
+        [SerializeField, Range(10f, 170f)] private float maximumOrbitAngle = 100f;
+        [SerializeField, Min(0.01f)] private float orbitSmoothTime = 0.3f;
+        [SerializeField, Min(0.01f)] private float orbitReturnTime = 1.5f;
+
+        private float desiredOrbitYaw;
+        private float orbitYaw;
+        private float orbitVelocity;
+        private bool draggingOrbit;
+        private bool applicationFocused = true;
+
         [Header("Subtle Water Motion")]
         [SerializeField] private bool enableWaterMotion = true;
         [SerializeField, Range(0f, 1f)] private float waterMotionIntensity = 1f;
@@ -35,6 +52,9 @@ namespace GameJamOcean.CameraSystem
         private void OnEnable()
         {
             followVelocity = Vector3.zero;
+            desiredOrbitYaw = orbitYaw = orbitVelocity = 0f;
+            draggingOrbit = false;
+            applicationFocused = Application.isFocused;
             headingVelocity = 0f;
             heading = target != null ? target.eulerAngles.y : 0f;
             basePosition = transform.position;
@@ -55,6 +75,7 @@ namespace GameJamOcean.CameraSystem
                 return;
             }
 
+            UpdateMouseOrbit();
             heading = Mathf.SmoothDampAngle(
                 heading, target.eulerAngles.y, ref headingVelocity,
                 headingSmoothTime, maximumHeadingSpeed, Time.deltaTime);
@@ -76,9 +97,57 @@ namespace GameJamOcean.CameraSystem
 
         private Vector3 GetRotatedOffset()
         {
-            return followTargetYaw
-                ? Quaternion.Euler(0f, heading, 0f) * offset
-                : offset;
+            float yaw = (followTargetYaw ? heading : 0f) + orbitYaw;
+            return Quaternion.Euler(0f, yaw, 0f) * offset;
+        }
+
+        private void UpdateMouseOrbit()
+        {
+            Mouse mouse = Mouse.current;
+            bool canOrbit = enableMouseOrbit && applicationFocused && Time.timeScale > 0f
+                && mouse != null && target.GetComponent<BoatController3D>() != null;
+            if (!canOrbit || !mouse.rightButton.isPressed)
+            {
+                draggingOrbit = false;
+            }
+            else if (mouse.rightButton.wasPressedThisFrame)
+            {
+                draggingOrbit = EventSystem.current == null
+                    || !EventSystem.current.IsPointerOverGameObject();
+                // Start from the current view if the player grabs it during recentering.
+                if (draggingOrbit) desiredOrbitYaw = orbitYaw;
+            }
+
+            if (draggingOrbit)
+            {
+                if (!mouse.rightButton.wasPressedThisFrame)
+                {
+                    // Mouse delta already represents this frame's displacement, not a speed.
+                    desiredOrbitYaw = Mathf.Clamp(desiredOrbitYaw
+                        + mouse.delta.ReadValue().x * mouseOrbitSensitivity,
+                        -maximumOrbitAngle, maximumOrbitAngle);
+                }
+            }
+            else
+            {
+                desiredOrbitYaw = 0f;
+            }
+
+            orbitYaw = Mathf.SmoothDamp(orbitYaw, desiredOrbitYaw, ref orbitVelocity,
+                draggingOrbit ? orbitSmoothTime : orbitReturnTime,
+                Mathf.Infinity, Time.deltaTime);
+        }
+
+        private void OnApplicationFocus(bool focused)
+        {
+            applicationFocused = focused;
+            if (!focused) draggingOrbit = false;
+        }
+
+        private void OnDisable()
+        {
+            draggingOrbit = false;
+            desiredOrbitYaw = 0f;
         }
 
         public void ConfigureRelaxedFollow()

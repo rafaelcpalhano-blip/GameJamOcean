@@ -1486,6 +1486,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameJamOcean.Interaction.InteractionPromptUI2D
   playerInteractor: {fileID: 1745452240}
+  playerInteractor3D: {fileID: 0}
   worldCamera: {fileID: 519420031}
   promptText: {fileID: 632571151}
   firstTimeMessage: Press F or Click
