@@ -22,6 +22,9 @@ namespace GameJamOcean.Combat
 
         public float CurrentHealth => currentHealth;
         public float MaximumHealth => maximumHealth;
+        public float NormalizedHealth => maximumHealth > 0f
+            ? Mathf.Clamp01(currentHealth / maximumHealth)
+            : 0f;
         public bool IsDead { get; private set; }
 
         private void Awake()

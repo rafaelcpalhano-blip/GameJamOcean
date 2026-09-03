@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using GameJamOcean.Boat;
 using GameJamOcean.CameraSystem;
+using GameJamOcean.Combat;
 using GameJamOcean.Interaction;
 using GameJamOcean.Spawning;
 using TMPro;
@@ -56,6 +57,7 @@ namespace GameJamOcean.EditorTools
             ConfigureBoatBounds(boatRoot);
             ConfigureDiveSpawnSystem(boatRoot.transform, false);
             ConfigureInteractionUI(interactor, mainCamera);
+            ConfigureBoatStatusUI(boatRoot);
             ConfigureEventSystem();
             ConfigureBuildSettings();
 
@@ -106,6 +108,145 @@ namespace GameJamOcean.EditorTools
                 "OK");
         }
 
+        [MenuItem("Tools/GameJamOcean/Configure Boat Status and HUD")]
+        public static void ConfigureBoatStatusAndHud()
+        {
+            Scene scene = SceneManager.GetActiveScene();
+            if (scene.name != TargetSceneName)
+            {
+                EditorUtility.DisplayDialog(
+                    "OceanScene 3D",
+                    $"Abra a cena '{TargetSceneName}' antes de executar este configurador.",
+                    "OK");
+                return;
+            }
+
+            GameObject boatRoot = GameObject.Find("BoatPlayer3D");
+            if (boatRoot == null)
+            {
+                EditorUtility.DisplayDialog(
+                    "OceanScene 3D",
+                    "O objeto BoatPlayer3D não foi encontrado. Execute primeiro Configure OceanScene 3D.",
+                    "OK");
+                return;
+            }
+
+            ConfigureBoatStats(boatRoot);
+            ConfigureBoatStatusUI(boatRoot);
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene, TargetScenePath);
+            Selection.activeGameObject = boatRoot;
+            EditorUtility.DisplayDialog(
+                "Boat Status",
+                "Vida, atributos escaláveis e HUD do barco foram configurados.",
+                "OK");
+        }
+
+        [MenuItem("Tools/GameJamOcean/Configure Boat Foam")]
+        public static void ConfigureBoatFoam()
+        {
+            Scene scene = SceneManager.GetActiveScene();
+            GameObject boat = GameObject.Find("BoatPlayer3D");
+            GameObject water = GameObject.Find("Water");
+            if (EditorApplication.isPlaying || scene.name != TargetSceneName
+                || boat == null || water == null)
+            {
+                EditorUtility.DisplayDialog("Boat Foam",
+                    "Abra OceanScene_3D fora do Play Mode, com BoatPlayer3D e Water presentes.", "OK");
+                return;
+            }
+            const string materialPath = "Assets/Materials/BoatFoam.mat";
+            Material material = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
+            if (material == null)
+            {
+                Shader shader = AssetDatabase.LoadAssetAtPath<Shader>("Assets/Materials/BoatFoam.shader");
+                if (shader == null)
+                {
+                    EditorUtility.DisplayDialog("Boat Foam", "Aguarde a importação de BoatFoam.shader.", "OK");
+                    return;
+                }
+                material = new Material(shader) { name = "BoatFoam" };
+                AssetDatabase.CreateAsset(material, materialPath);
+            }
+            BoatFoam3D foam = GetOrAddComponent<BoatFoam3D>(boat);
+            Undo.RecordObject(foam, "Configure boat foam");
+            foam.Configure(material, water.transform, boat.GetComponent<BoxCollider>());
+            EditorUtility.SetDirty(foam);
+            AssetDatabase.SaveAssets();
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene, TargetScenePath);
+            Selection.activeGameObject = boat;
+            EditorUtility.DisplayDialog("Boat Foam",
+                "Espuma configurada. Entre no Play Mode e navegue para visualizar. Controles e câmera preservados.", "OK");
+        }
+
+        [MenuItem("Tools/GameJamOcean/Configure Relaxed Boat Handling")]
+        public static void ConfigureRelaxedBoatHandling()
+        {
+            Scene scene = SceneManager.GetActiveScene();
+            GameObject boat = GameObject.Find("BoatPlayer3D");
+            if (EditorApplication.isPlaying || scene.name != TargetSceneName
+                || boat == null || Camera.main == null)
+            {
+                EditorUtility.DisplayDialog("Boat Handling",
+                    "Abra OceanScene_3D fora do Play Mode, com BoatPlayer3D e Main Camera presentes.", "OK");
+                return;
+            }
+
+            BoatController3D controller = boat.GetComponent<BoatController3D>();
+            CameraFollow3D follow = Camera.main.GetComponent<CameraFollow3D>();
+            if (controller == null || follow == null) return;
+            Undo.RecordObject(controller, "Relaxed boat handling");
+            controller.ConfigureRelaxedHandling();
+            BoatStats3D stats = boat.GetComponent<BoatStats3D>();
+            if (stats != null)
+            {
+                Undo.RecordObject(stats, "Relaxed base acceleration");
+                stats.ConfigureRelaxedAcceleration();
+            }
+            Undo.RecordObject(follow, "Relaxed camera follow");
+            follow.ConfigureRelaxedFollow();
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene, TargetScenePath);
+            Selection.activeGameObject = boat;
+            EditorUtility.DisplayDialog("Boat Handling",
+                "Controles de leme, inércia, freio/ré e câmera suave configurados. Offset preservado.", "OK");
+        }
+
+        [MenuItem("Tools/GameJamOcean/Configure Boat Camera and Water Motion")]
+        public static void ConfigureBoatCameraAndWaterMotion()
+        {
+            Scene scene = SceneManager.GetActiveScene();
+            GameObject boat = GameObject.Find("BoatPlayer3D");
+            if (EditorApplication.isPlaying || scene.name != TargetSceneName
+                || boat == null || Camera.main == null)
+            {
+                EditorUtility.DisplayDialog("Boat Camera",
+                    "Abra OceanScene_3D fora do Play Mode, com BoatPlayer3D e Main Camera presentes.", "OK");
+                return;
+            }
+
+            Transform model = boat.transform.Find("boat-speed-b");
+            if (model == null)
+            {
+                EditorUtility.DisplayDialog("Boat Camera",
+                    "Não encontrei o filho visual boat-speed-b dentro de BoatPlayer3D.", "OK");
+                return;
+            }
+
+            CameraFollow3D follow = GetOrAddComponent<CameraFollow3D>(Camera.main.gameObject);
+            Undo.RecordObject(follow, "Follow boat heading");
+            follow.ConfigureHeadingFollow(boat.transform);
+            BoatWaterMotion3D motion = GetOrAddComponent<BoatWaterMotion3D>(boat);
+            Undo.RecordObject(motion, "Configure visual boat motion");
+            motion.Configure(model);
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene, TargetScenePath);
+            Selection.activeGameObject = Camera.main.gameObject;
+            EditorUtility.DisplayDialog("Boat Camera",
+                "Câmera e balanço visual configurados. O Offset da câmera foi preservado.", "OK");
+        }
+
         private static GameObject ConfigureBoat()
         {
             GameObject boatRoot = GameObject.Find("BoatPlayer3D");
@@ -140,9 +281,20 @@ namespace GameJamOcean.EditorTools
             FitBoxCollider(boatRoot.transform, collider, new Vector3(0.72f, 0.45f, 0.78f));
 
             BoatController3D controller = GetOrAddComponent<BoatController3D>(boatRoot);
-            controller.ConfigureInput(FindActionReference("Player", "Move"));
+            controller.ConfigureInput(
+                FindActionReference("Player", "Move"),
+                FindActionReference("Player", "Sprint"));
             GetOrAddComponent<PlayerInteractor3D>(boatRoot);
+            ConfigureBoatStats(boatRoot);
             return boatRoot;
+        }
+
+        private static void ConfigureBoatStats(GameObject boatRoot)
+        {
+            GetOrAddComponent<Health>(boatRoot);
+            BoatStats3D stats = GetOrAddComponent<BoatStats3D>(boatRoot);
+            stats.ConfigureBaseStats(100f, 6f, 2.5f);
+            stats.ConfigureBaseTurbo(3f, 1.75f, 1.5f, 0.5f, 1.25f);
         }
 
         private static Camera ConfigureCamera(Transform boat)
@@ -378,24 +530,7 @@ namespace GameJamOcean.EditorTools
 
         private static void ConfigureInteractionUI(PlayerInteractor3D interactor, Camera mainCamera)
         {
-            GameObject canvasObject = GameObject.Find("OceanInteractionCanvas");
-            if (canvasObject == null)
-            {
-                canvasObject = new GameObject(
-                    "OceanInteractionCanvas",
-                    typeof(RectTransform),
-                    typeof(Canvas),
-                    typeof(CanvasScaler),
-                    typeof(GraphicRaycaster));
-                Undo.RegisterCreatedObjectUndo(canvasObject, "Create interaction canvas");
-            }
-
-            Canvas canvas = canvasObject.GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920f, 1080f);
-            scaler.matchWidthOrHeight = 0.5f;
+            GameObject canvasObject = GetOrCreateOceanCanvas();
 
             Transform existingText = canvasObject.transform.Find("InteractionPromptText");
             GameObject textObject;
@@ -423,6 +558,174 @@ namespace GameJamOcean.EditorTools
 
             InteractionPromptUI2D prompt = GetOrAddComponent<InteractionPromptUI2D>(textObject);
             prompt.Configure3D(interactor, mainCamera, text);
+        }
+
+        private static void ConfigureBoatStatusUI(GameObject boatRoot)
+        {
+            GameObject canvasObject = GetOrCreateOceanCanvas();
+            Transform existingHud = canvasObject.transform.Find("BoatStatusHUD");
+            GameObject hudObject;
+            if (existingHud == null)
+            {
+                hudObject = new GameObject("BoatStatusHUD", typeof(RectTransform));
+                Undo.RegisterCreatedObjectUndo(hudObject, "Create boat status HUD");
+                hudObject.transform.SetParent(canvasObject.transform, false);
+            }
+            else
+            {
+                hudObject = existingHud.gameObject;
+            }
+
+            RectTransform hudRect = hudObject.GetComponent<RectTransform>();
+            hudRect.anchorMin = new Vector2(0f, 1f);
+            hudRect.anchorMax = new Vector2(0f, 1f);
+            hudRect.pivot = new Vector2(0f, 1f);
+            hudRect.anchoredPosition = new Vector2(24f, -24f);
+            hudRect.sizeDelta = new Vector2(360f, 84f);
+
+            CreateHudBar(
+                hudRect,
+                "HealthBar",
+                0f,
+                new Color(0.2f, 0.85f, 0.35f, 1f),
+                out Image healthFill,
+                out TextMeshProUGUI healthText);
+            Transform legacyAccelerationBar = hudRect.Find("AccelerationBar");
+            if (hudRect.Find("TurboBar") == null && legacyAccelerationBar != null)
+            {
+                legacyAccelerationBar.name = "TurboBar";
+            }
+
+            CreateHudBar(
+                hudRect,
+                "TurboBar",
+                -44f,
+                new Color(0.15f, 0.75f, 1f, 1f),
+                out Image turboFill,
+                out TextMeshProUGUI turboText);
+
+            BoatStatusHUD3D hud = GetOrAddComponent<BoatStatusHUD3D>(hudObject);
+            hud.Configure(
+                boatRoot.GetComponent<Health>(),
+                boatRoot.GetComponent<BoatController3D>(),
+                healthFill,
+                healthText,
+                turboFill,
+                turboText);
+        }
+
+        private static GameObject GetOrCreateOceanCanvas()
+        {
+            GameObject canvasObject = GameObject.Find("OceanInteractionCanvas");
+            if (canvasObject == null)
+            {
+                canvasObject = new GameObject(
+                    "OceanInteractionCanvas",
+                    typeof(RectTransform),
+                    typeof(Canvas),
+                    typeof(CanvasScaler),
+                    typeof(GraphicRaycaster));
+                Undo.RegisterCreatedObjectUndo(canvasObject, "Create ocean canvas");
+            }
+
+            Canvas canvas = canvasObject.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.matchWidthOrHeight = 0.5f;
+            return canvasObject;
+        }
+
+        private static void CreateHudBar(
+            RectTransform parent,
+            string barName,
+            float verticalPosition,
+            Color fillColor,
+            out Image fill,
+            out TextMeshProUGUI label)
+        {
+            Sprite uiSprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+            Transform existingBar = parent.Find(barName);
+            GameObject barObject;
+            if (existingBar == null)
+            {
+                barObject = new GameObject(barName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+                Undo.RegisterCreatedObjectUndo(barObject, $"Create {barName}");
+                barObject.transform.SetParent(parent, false);
+            }
+            else
+            {
+                barObject = existingBar.gameObject;
+            }
+
+            RectTransform barRect = barObject.GetComponent<RectTransform>();
+            barRect.anchorMin = new Vector2(0f, 1f);
+            barRect.anchorMax = new Vector2(1f, 1f);
+            barRect.pivot = new Vector2(0.5f, 1f);
+            barRect.anchoredPosition = new Vector2(0f, verticalPosition);
+            barRect.sizeDelta = new Vector2(0f, 36f);
+            Image background = barObject.GetComponent<Image>();
+            background.sprite = uiSprite;
+            background.type = Image.Type.Sliced;
+            background.color = new Color(0.025f, 0.06f, 0.09f, 0.88f);
+            background.raycastTarget = false;
+
+            Transform existingFill = barObject.transform.Find("Fill");
+            GameObject fillObject;
+            if (existingFill == null)
+            {
+                fillObject = new GameObject("Fill", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+                Undo.RegisterCreatedObjectUndo(fillObject, $"Create {barName} fill");
+                fillObject.transform.SetParent(barObject.transform, false);
+            }
+            else
+            {
+                fillObject = existingFill.gameObject;
+            }
+
+            RectTransform fillRect = fillObject.GetComponent<RectTransform>();
+            fillRect.anchorMin = Vector2.zero;
+            fillRect.anchorMax = Vector2.one;
+            fillRect.offsetMin = new Vector2(3f, 3f);
+            fillRect.offsetMax = new Vector2(-3f, -3f);
+            fill = fillObject.GetComponent<Image>();
+            fill.sprite = uiSprite;
+            fill.type = Image.Type.Filled;
+            fill.fillMethod = Image.FillMethod.Horizontal;
+            fill.fillOrigin = 0;
+            fill.fillAmount = 1f;
+            fill.color = fillColor;
+            fill.raycastTarget = false;
+
+            Transform existingLabel = barObject.transform.Find("Label");
+            GameObject labelObject;
+            if (existingLabel == null)
+            {
+                labelObject = new GameObject(
+                    "Label",
+                    typeof(RectTransform),
+                    typeof(CanvasRenderer),
+                    typeof(TextMeshProUGUI));
+                Undo.RegisterCreatedObjectUndo(labelObject, $"Create {barName} label");
+                labelObject.transform.SetParent(barObject.transform, false);
+            }
+            else
+            {
+                labelObject = existingLabel.gameObject;
+            }
+
+            RectTransform labelRect = labelObject.GetComponent<RectTransform>();
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = Vector2.zero;
+            labelRect.offsetMax = Vector2.zero;
+            label = labelObject.GetComponent<TextMeshProUGUI>();
+            label.fontSize = 20f;
+            label.fontStyle = FontStyles.Bold;
+            label.alignment = TextAlignmentOptions.Center;
+            label.color = Color.white;
+            label.raycastTarget = false;
         }
 
         private static void ConfigureEventSystem()
