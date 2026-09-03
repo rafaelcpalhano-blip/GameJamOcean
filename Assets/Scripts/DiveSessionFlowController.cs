@@ -17,7 +17,7 @@ namespace GameJamOcean.Flow
         [SerializeField] private HarpoonLauncher2D playerWeapon;
 
         [Header("Return To Ocean")]
-        [SerializeField] private string oceanSceneName = "OceanScene";
+        [SerializeField] private string oceanSceneName = "OceanScene_3D";
         [SerializeField, Min(0f)] private float victoryReturnDelay = 1.5f;
         [SerializeField, Min(0f)] private float defeatReturnDelay = 1f;
 

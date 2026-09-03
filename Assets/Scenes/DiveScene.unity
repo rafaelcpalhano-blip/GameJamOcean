@@ -318,7 +318,7 @@ MonoBehaviour:
   sessionManager: {fileID: 120683033}
   playerMovement: {fileID: 1745452235}
   playerWeapon: {fileID: 1745452238}
-  oceanSceneName: OceanScene
+  oceanSceneName: OceanScene_3D
   victoryReturnDelay: 4
   defeatReturnDelay: 1
   transitioning: 0

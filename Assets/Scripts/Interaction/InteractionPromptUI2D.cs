@@ -8,6 +8,7 @@ namespace GameJamOcean.Interaction
     {
         [Header("References")]
         [SerializeField] private PlayerInteractor2D playerInteractor;
+        [SerializeField] private PlayerInteractor3D playerInteractor3D;
         [SerializeField] private Camera worldCamera;
         [SerializeField] private TMP_Text promptText;
 
@@ -61,7 +62,10 @@ namespace GameJamOcean.Interaction
                 return;
             }
 
-            InteractionPromptTarget2D nearbyTarget = FindTarget(playerInteractor?.CurrentInteractable);
+            IInteractable focusedInteractable = playerInteractor != null
+                ? playerInteractor.CurrentInteractable
+                : playerInteractor3D?.CurrentInteractable;
+            InteractionPromptTarget2D nearbyTarget = FindTarget(focusedInteractable);
             if (nearbyTarget != null && nearbyTarget.IsAvailable)
             {
                 Show(nearbyTarget, nearbyMessage);
@@ -76,6 +80,19 @@ namespace GameJamOcean.Interaction
         {
             InteractionDiscoveryStore.ResetAll();
             tutorialTarget = null;
+            Hide();
+        }
+
+        public void Configure3D(
+            PlayerInteractor3D interactor,
+            Camera targetCamera,
+            TMP_Text targetText)
+        {
+            playerInteractor = null;
+            playerInteractor3D = interactor;
+            worldCamera = targetCamera;
+            promptText = targetText;
+            FindReferencesIfNeeded();
             Hide();
         }
 
@@ -174,6 +191,11 @@ namespace GameJamOcean.Interaction
             if (playerInteractor == null)
             {
                 playerInteractor = FindFirstObjectByType<PlayerInteractor2D>();
+            }
+
+            if (playerInteractor == null && playerInteractor3D == null)
+            {
+                playerInteractor3D = FindFirstObjectByType<PlayerInteractor3D>();
             }
 
             if (worldCamera == null)
