@@ -78,6 +78,7 @@ namespace GameJamOcean.Diving
         public event Action<int> CollectedCoinGoldChanged;
         public event Action<float> CompletionPercentageChanged;
         public event Action SessionStarted;
+        public event Action FinalChestReady;
         public event Action SessionWon;
         public event Action SessionLost;
 
@@ -286,6 +287,7 @@ namespace GameJamOcean.Diving
             }
 
             sessionState = DiveSessionState.AwaitingFinalChest;
+            FinalChestReady?.Invoke();
             onAllEnemiesDefeated?.Invoke();
         }
 
@@ -399,17 +401,18 @@ namespace GameJamOcean.Diving
         [SerializeField, Min(20)] private int candidatePointCount = 20;
         [SerializeField, Min(.1f)] private float boundaryMargin = .75f;
         [SerializeField, Min(.1f)] private float minimumPlayerDistance = 2.5f;
-        [Header("Health Power Up")]
+        [Header("Power Ups")]
         [SerializeField, Min(.1f)] private float healthRestored = 1f;
-        [SerializeField, Range(.1f, 1f)] private float spriteScale = .65f;
-        [SerializeField, Range(1f, 99f)] private float secondSpawnPercentage = 20f;
+        [SerializeField] private float[] baseSpawnPercentages = { 0f, 20f, 40f, 80f };
 
         private readonly List<Vector2> candidatePoints = new();
+        private readonly List<float> scheduledPercentages = new();
         private DiveSessionManager session;
         private MovementBounds2D movementBounds;
         private Health playerHealth;
         private Sprite maskSprite;
-        private bool initialSpawned, milestoneSpawned;
+        private DivePowerUpSettings settings;
+        private int nextSpawnMilestone;
         private int previousPoint = -1;
 
         public void Configure(DiveSessionManager owner)
@@ -420,12 +423,13 @@ namespace GameJamOcean.Diving
             var diver = FindFirstObjectByType<DiverController>();
             playerHealth = diver != null ? diver.GetComponent<Health>() : null;
             maskSprite = FindFirstObjectByType<DiveHealthDisplayUI>()?.MaskSprite;
-            initialSpawned = milestoneSpawned = false;
+            settings = Resources.Load<DivePowerUpSettings>("DivePowerUpSettings");
+            nextSpawnMilestone = 0;
             previousPoint = -1;
+            BuildSchedule();
             GenerateCandidatePoints();
             if (session != null) session.CompletionPercentageChanged += HandleProgress;
-            SpawnHealthPowerUp();
-            initialSpawned = true;
+            SpawnReachedPowerUps(0f);
         }
 
         private void OnDisable()
@@ -435,9 +439,29 @@ namespace GameJamOcean.Diving
 
         private void HandleProgress(float percentage)
         {
-            if (!initialSpawned || milestoneSpawned || percentage + Mathf.Epsilon < secondSpawnPercentage) return;
-            milestoneSpawned = true;
-            SpawnHealthPowerUp();
+            SpawnReachedPowerUps(percentage);
+        }
+
+        private void SpawnReachedPowerUps(float percentage)
+        {
+            while (nextSpawnMilestone < scheduledPercentages.Count
+                && percentage + Mathf.Epsilon >= scheduledPercentages[nextSpawnMilestone])
+            {
+                SpawnRandomPowerUp();
+                nextSpawnMilestone++;
+            }
+        }
+
+        private void BuildSchedule()
+        {
+            scheduledPercentages.Clear();
+            if (baseSpawnPercentages != null)
+                foreach (float percentage in baseSpawnPercentages)
+                    scheduledPercentages.Add(Mathf.Clamp(percentage, 0f, 100f));
+            int extrasBeforeHalf = session != null ? Mathf.Max(0, session.DifficultyLevel - 1) : 0;
+            for (int i = 0; i < extrasBeforeHalf; i++)
+                scheduledPercentages.Add(UnityEngine.Random.Range(5f, 49f));
+            scheduledPercentages.Sort();
         }
 
         private void GenerateCandidatePoints()
@@ -454,30 +478,56 @@ namespace GameJamOcean.Diving
                     UnityEngine.Random.Range(minY, maxY)));
         }
 
-        private void SpawnHealthPowerUp()
+        private void SpawnRandomPowerUp()
         {
             if (candidatePoints.Count == 0 || playerHealth == null || maskSprite == null) return;
             int selected = SelectPoint();
             previousPoint = selected;
-            var pickup = new GameObject("PowerUp_Vida");
+            DivePowerUpKind kind = settings != null
+                ? (DivePowerUpKind)UnityEngine.Random.Range(0, 4)
+                : DivePowerUpKind.Health;
+            var pickup = new GameObject($"PowerUp_{kind}");
             pickup.transform.position = candidatePoints[selected];
-            pickup.transform.localScale = Vector3.one * spriteScale;
-            var renderer = pickup.AddComponent<SpriteRenderer>();
-            renderer.sprite = maskSprite;
-            renderer.color = new Color(1f, .72f, .72f, 1f);
+            pickup.transform.localScale = Vector3.one * (settings != null ? settings.pickupScale : .8f);
             var playerRenderer = playerHealth.GetComponentInChildren<SpriteRenderer>();
-            if (playerRenderer != null)
-            {
-                renderer.sortingLayerID = playerRenderer.sortingLayerID;
-                renderer.sortingOrder = playerRenderer.sortingOrder + 3;
-            }
+            CreateVisuals(pickup.transform, kind, playerRenderer);
             var body = pickup.AddComponent<Rigidbody2D>();
             body.bodyType = RigidbodyType2D.Kinematic;
             body.gravityScale = 0f;
             var collider = pickup.AddComponent<CircleCollider2D>();
             collider.isTrigger = true;
             collider.radius = .45f;
-            pickup.AddComponent<DiveHealthPowerUp2D>().Configure(healthRestored);
+            pickup.AddComponent<DivePowerUpPickup2D>().Configure(kind, healthRestored, settings);
+        }
+
+        private void CreateVisuals(Transform root, DivePowerUpKind kind, SpriteRenderer playerRenderer)
+        {
+            Sprite[] sprites = kind switch
+            {
+                DivePowerUpKind.DoubleHarpoon => settings != null ? settings.doubleHarpoonSprites : null,
+                DivePowerUpKind.Shield => settings != null ? new[] { settings.shieldSprite } : null,
+                DivePowerUpKind.Speed => settings != null ? new[] { settings.speedSprite } : null,
+                _ => new[] { maskSprite }
+            };
+            if (sprites == null || sprites.Length == 0 || sprites[0] == null)
+                sprites = new[] { maskSprite };
+            for (int i = 0; i < sprites.Length; i++)
+            {
+                var visual = new GameObject("Visual", typeof(SpriteRenderer));
+                visual.transform.SetParent(root, false);
+                SpriteRenderer renderer = visual.GetComponent<SpriteRenderer>();
+                renderer.sprite = sprites[i];
+                float normalizedScale = 1f / Mathf.Max(.01f, sprites[i].bounds.size.y);
+                visual.transform.localScale = Vector3.one * normalizedScale;
+                Vector3 layout = Vector3.right * ((i - (sprites.Length - 1) * .5f) * .42f);
+                visual.transform.localPosition = layout - sprites[i].bounds.center * normalizedScale;
+                if (kind == DivePowerUpKind.Health) renderer.color = new Color(1f, .72f, .72f, 1f);
+                if (playerRenderer != null)
+                {
+                    renderer.sortingLayerID = playerRenderer.sortingLayerID;
+                    renderer.sortingOrder = playerRenderer.sortingOrder + 3;
+                }
+            }
         }
 
         private int SelectPoint()
@@ -496,29 +546,60 @@ namespace GameJamOcean.Diving
         }
     }
 
-    public sealed class DiveHealthPowerUp2D : MonoBehaviour
+    public sealed class DivePowerUpPickup2D : MonoBehaviour
     {
+        private DivePowerUpKind kind;
         private float healthRestored = 1f;
+        private DivePowerUpSettings settings;
         private Vector3 origin;
+        private Vector3 baseScale;
 
-        public void Configure(float amount)
+        public void Configure(DivePowerUpKind powerUpKind, float amount, DivePowerUpSettings configuration)
         {
+            kind = powerUpKind;
             healthRestored = Mathf.Max(.1f, amount);
+            settings = configuration;
             origin = transform.position;
+            baseScale = transform.localScale;
         }
 
         private void Update()
         {
             transform.position = origin + Vector3.up * (Mathf.Sin(Time.time * 3f) * .08f);
-            transform.Rotate(0f, 0f, 35f * Time.deltaTime);
+            transform.localScale = baseScale * (1f + Mathf.Sin(Time.time * 4f) * .08f);
         }
 
         private void OnTriggerEnter2D(Collider2D other)
         {
             DiverController diver = other.GetComponentInParent<DiverController>();
-            if (diver == null || !diver.TryGetComponent(out Health health)
-                || health.IsDead || health.CurrentHealth >= health.MaximumHealth) return;
-            health.Heal(Mathf.Min(healthRestored, health.MaximumHealth - health.CurrentHealth));
+            if (diver == null || !diver.TryGetComponent(out Health health) || health.IsDead) return;
+            switch (kind)
+            {
+                case DivePowerUpKind.Health:
+                    if (health.CurrentHealth >= health.MaximumHealth) return;
+                    health.Heal(Mathf.Min(healthRestored, health.MaximumHealth - health.CurrentHealth));
+                    SpriteRenderer playerSprite = diver.GetComponent<SpriteRenderer>();
+                    if (playerSprite != null)
+                    {
+                        Vector3 top = playerSprite.bounds.center
+                            + Vector3.up * (playerSprite.bounds.extents.y + .2f);
+                        DiveFeedbackParticle.SpawnPlayerHealthChange(top, true,
+                            playerSprite.sortingLayerID, playerSprite.sortingOrder);
+                    }
+                    break;
+                case DivePowerUpKind.DoubleHarpoon:
+                    diver.GetComponent<GameJamOcean.Weapons.HarpoonLauncher2D>()?.ActivateDoubleShot(
+                        settings != null ? settings.doubleHarpoonDuration : 7f,
+                        settings != null ? settings.doubleHarpoonAngle : 18f);
+                    break;
+                case DivePowerUpKind.Shield:
+                    health.GrantImmunity(settings != null ? settings.shieldDuration : 5f);
+                    break;
+                case DivePowerUpKind.Speed:
+                    diver.ActivateSpeedBoost(settings != null ? settings.speedDuration : 7f,
+                        settings != null ? settings.speedMultiplier : 1.5f);
+                    break;
+            }
             Destroy(gameObject);
         }
     }

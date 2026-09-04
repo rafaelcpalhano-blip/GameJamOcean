@@ -12,6 +12,8 @@ namespace GameJamOcean.Audio
         private Coroutine letterSounds;
         public float BackgroundVolume { get; private set; }
         public float EffectsVolume { get; private set; }
+        public float PanelOpenDuration => settings != null && settings.panelOpen != null
+            ? settings.panelOpen.length : 0f;
         private void Awake()
         {
             Instance = this;
@@ -74,15 +76,6 @@ namespace GameJamOcean.Audio
         {
             if (settings != null && settings.harpoonShot != null)
                 effects.PlayOneShot(settings.harpoonShot, 0.15f);
-        }
-        private void Update()
-        {
-            // Web browsers may initially suspend audio until the first user gesture.
-            if (AudioListener.pause || ambience.clip == null || ambience.isPlaying) return;
-            var mouse = UnityEngine.InputSystem.Mouse.current;
-            var keyboard = UnityEngine.InputSystem.Keyboard.current;
-            if ((mouse != null && mouse.leftButton.wasPressedThisFrame)
-                || (keyboard != null && keyboard.anyKey.wasPressedThisFrame)) ambience.Play();
         }
         private void OnDestroy() { if (Instance == this) Instance = null; }
         // Route future obstacle/dive effects through this source to respect the effects slider.

@@ -182,7 +182,7 @@ MonoBehaviour:
   speed: 12
   flightSpeedMultiplier: 0.9
   damage: 1
-  lifetime: 1.2
+  lifetime: 1.5
   hittableLayers:
     serializedVersion: 2
     m_Bits: 4294967295

@@ -28,6 +28,14 @@ namespace GameJamOcean.Weapons
 
         private bool enabledAttackAction;
         private float nextFireTime;
+        private float doubleShotUntil;
+        private float doubleShotAngle = 18f;
+
+        public void ActivateDoubleShot(float duration, float angle)
+        {
+            doubleShotUntil = Mathf.Max(doubleShotUntil, Time.time + Mathf.Max(.1f, duration));
+            doubleShotAngle = Mathf.Clamp(angle, 1f, 60f);
+        }
 
         private void Awake()
         {
@@ -112,14 +120,30 @@ namespace GameJamOcean.Weapons
                 ? origin
                 : origin + direction * fallbackSpawnDistance;
 
-            HarpoonProjectile2D harpoon = Instantiate(
-                harpoonPrefab,
-                spawnPosition,
-                Quaternion.identity);
-            harpoon.Launch(direction, gameObject);
-            HarpoonFired?.Invoke(spawnPosition, direction);
+            if (Time.time < doubleShotUntil)
+            {
+                LaunchHarpoon(Rotate(direction, -doubleShotAngle * .5f), spawnPosition);
+                LaunchHarpoon(Rotate(direction, doubleShotAngle * .5f), spawnPosition);
+            }
+            else LaunchHarpoon(direction, spawnPosition);
             GameJamOcean.Audio.GameAudio.Instance?.PlayHarpoon();
             nextFireTime = Time.time + fireCooldown + Mathf.Max(0f, additionalShotDelay);
+        }
+
+        private void LaunchHarpoon(Vector2 direction, Vector2 spawnPosition)
+        {
+            HarpoonProjectile2D harpoon = Instantiate(harpoonPrefab, spawnPosition, Quaternion.identity);
+            harpoon.Launch(direction, gameObject);
+            HarpoonFired?.Invoke(spawnPosition, direction);
+        }
+
+        private static Vector2 Rotate(Vector2 direction, float degrees)
+        {
+            float radians = degrees * Mathf.Deg2Rad;
+            float sine = Mathf.Sin(radians);
+            float cosine = Mathf.Cos(radians);
+            return new Vector2(direction.x * cosine - direction.y * sine,
+                direction.x * sine + direction.y * cosine).normalized;
         }
 
         private void OnValidate()

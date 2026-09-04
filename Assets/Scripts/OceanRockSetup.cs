@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using GameJamOcean.Boat;
@@ -57,9 +58,10 @@ namespace GameJamOcean.World
     public sealed class WindVfxEnhancer3D : MonoBehaviour
     {
         [Header("Wind visibility")]
-        [SerializeField, Min(.1f)] private float particleAmount = 2f;
+        [SerializeField, Min(.1f)] private float particleAmount = 3f;
         [SerializeField, Min(.1f)] private float visibility = 2.5f;
         private bool applied;
+        private readonly List<Material> webMaterials = new();
 
         public static void ConfigureScene(Scene scene)
         {
@@ -112,8 +114,37 @@ namespace GameJamOcean.World
                     shapeScale.y = Mathf.Max(.5f, Mathf.Abs(topLocal.y - bottomLocal.y));
                     shape.scale = shapeScale;
                 }
+                ApplyWebSafeMaterial(particles);
                 if (!particles.isPlaying) particles.Play(true);
             }
+        }
+
+        private void ApplyWebSafeMaterial(ParticleSystem particles)
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            ParticleSystemRenderer renderer = particles.GetComponent<ParticleSystemRenderer>();
+            Material template = Resources.Load<Material>("WindWebFallback");
+            if (renderer == null || template == null) return;
+            Material original = renderer.sharedMaterial;
+            Material webMaterial = new Material(template) { name = "Wind URP Web Material (Runtime)" };
+            Texture texture = null;
+            if (original != null)
+            {
+                if (original.HasProperty("_MainTexture")) texture = original.GetTexture("_MainTexture");
+                if (texture == null && original.HasProperty("_CutoutTexture")) texture = original.GetTexture("_CutoutTexture");
+                if (texture == null && original.HasProperty("_OpacityTexture")) texture = original.GetTexture("_OpacityTexture");
+            }
+            if (texture != null) webMaterial.SetTexture("_BaseMap", texture);
+            renderer.sharedMaterial = webMaterial;
+            webMaterials.Add(webMaterial);
+#endif
+        }
+
+        private void OnDestroy()
+        {
+            foreach (Material material in webMaterials)
+                if (material != null) Destroy(material);
+            webMaterials.Clear();
         }
 
         private static void GetVisibleHeightRange(out float waterHeight, out float highestBuilding)

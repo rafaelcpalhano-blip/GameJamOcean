@@ -30,6 +30,7 @@ namespace GameJamOcean.UI
         private bool firstScene = true, requestMain, main, open, loading;
         private bool requestIntro, transitioning;
         private bool showingLetter;
+        private Coroutine typewriter;
         private static readonly string[] RescueMessages =
         {
             "O mar não está pra peixe… e hoje também não estava pra barco! Respire fundo: amanhã a pescaria de tesouros continua.",
@@ -116,6 +117,7 @@ namespace GameJamOcean.UI
                 if (Time.frameCount > letterFrame && (direction || click))
                 {
                     showingLetter = false;
+                    StopTypewriter();
                     gameAudio.StopLetter();
                     StartGameplay();
                 }
@@ -218,13 +220,14 @@ namespace GameJamOcean.UI
             letterFrame = Time.frameCount;
             ClearPanel("UMA NOVA VIDA");
             panel.GetComponent<Image>().color = new Color(.02f, .09f, .14f, .9f);
-            Label("<b>Um bom lugar para começar uma vida de mergulhador profissional, não acha?</b>\n\n"
+            TMP_Text body = Label("<b>Um bom lugar para começar uma vida de mergulhador profissional, não acha?</b>\n\n"
                 + "Dizem que tesouros e riquezas esquecidas aguardam nas profundezas.\n"
                 + "Quanto mais você conquistar, mais poderá melhorar suas instalações, seu transporte e seus equipamentos. "
                 + "Mas não se engane: quanto mais forte você ficar, mais profundo poderá ir… e maiores serão os perigos que encontrará.",
                 -95, 23, 335);
             Label("Clique ou pressione WASD / setas para continuar", -450, 18);
             gameAudio.StartLetter();
+            BeginTypewriter(body);
         }
 
         public static void ShowRescueLetter()
@@ -236,9 +239,40 @@ namespace GameJamOcean.UI
             instance.letterFrame = Time.frameCount;
             instance.ClearPanel("DE VOLTA AO ESTALEIRO");
             instance.panel.GetComponent<Image>().color = new Color(.02f, .09f, .14f, .9f);
-            instance.Label(RescueMessages[UnityEngine.Random.Range(0, RescueMessages.Length)], -130, 26, 240);
+            TMP_Text body = instance.Label(RescueMessages[UnityEngine.Random.Range(0, RescueMessages.Length)], -130, 26, 240);
             instance.Label("Clique ou pressione WASD / setas para continuar", -450, 18);
             instance.gameAudio.StartLetter();
+            instance.BeginTypewriter(body);
+        }
+
+        private void BeginTypewriter(TMP_Text text)
+        {
+            StopTypewriter();
+            typewriter = StartCoroutine(TypeLetter(text));
+        }
+
+        private IEnumerator TypeLetter(TMP_Text text)
+        {
+            text.maxVisibleCharacters = 0;
+            text.ForceMeshUpdate();
+            int total = text.textInfo.characterCount;
+            if (gameAudio.PanelOpenDuration > 0f)
+                yield return new WaitForSecondsRealtime(gameAudio.PanelOpenDuration);
+            const float charactersPerSecond = 70f;
+            float visible = 0f;
+            while (text != null && text.maxVisibleCharacters < total)
+            {
+                visible += charactersPerSecond * Time.unscaledDeltaTime;
+                text.maxVisibleCharacters = Mathf.Min(total, Mathf.FloorToInt(visible));
+                yield return null;
+            }
+            typewriter = null;
+        }
+
+        private void StopTypewriter()
+        {
+            if (typewriter != null) StopCoroutine(typewriter);
+            typewriter = null;
         }
 
         private IEnumerator EnterGameplay()

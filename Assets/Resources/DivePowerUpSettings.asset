@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5b4721c105e24d7597ebda2e490afd72, type: 3}
+  m_Name: DivePowerUpSettings
+  m_EditorClassIdentifier: Assembly-CSharp::GameJamOcean.Diving.DivePowerUpSettings
+  doubleHarpoonSprites:
+  - {fileID: -9005729591212711491, guid: 568186e5b4e28934792cd8465b274ba5, type: 3}
+  - {fileID: 6160021786610345085, guid: 568186e5b4e28934792cd8465b274ba5, type: 3}
+  shieldSprite: {fileID: 4556617768182904718, guid: 9336c539d8c6a6245b95e32de161d280, type: 3}
+  speedSprite: {fileID: 973674837010917727, guid: 293a379e0c6cb79428de82ab26de293b, type: 3}
+  doubleHarpoonDuration: 7
+  doubleHarpoonAngle: 18
+  shieldDuration: 5
+  speedDuration: 7
+  speedMultiplier: 1.5
+  pickupScale: 0.9

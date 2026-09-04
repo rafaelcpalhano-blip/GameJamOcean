@@ -17,6 +17,8 @@ namespace GameJamOcean.Combat
         public float LastDamageAmount { get; private set; }
         public bool IsImmune => Time.time < immuneUntil;
         public void ConfigureDamageImmunity(float duration) => damageImmunityDuration = Mathf.Max(0f, duration);
+        public void GrantImmunity(float duration) => immuneUntil = Mathf.Max(immuneUntil,
+            Time.time + Mathf.Max(0f, duration));
 
         [Header("Events")]
         [SerializeField] private UnityEvent onDamaged;

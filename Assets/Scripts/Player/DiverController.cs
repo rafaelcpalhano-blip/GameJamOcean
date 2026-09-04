@@ -42,8 +42,24 @@ namespace GameJamOcean.Player
         private float nextBubbleTime;
         private Vector2 lastDirection = Vector2.down;
         private Vector2 dashDirection;
+        private Vector2 knockbackVelocity;
+        private float knockbackUntil;
+        private float speedBoostUntil;
+        private float speedBoostMultiplier = 1f;
         public float DashCooldownRemaining => Mathf.Max(0f, nextDashTime - Time.time);
         public bool IsDashing => enabled && Time.time < dashUntil;
+        public void ApplyKnockback(Vector2 velocity, float duration)
+        {
+            if (health == null || health.IsDead) return;
+            knockbackVelocity = velocity;
+            knockbackUntil = Mathf.Max(knockbackUntil, Time.time + Mathf.Max(.05f, duration));
+        }
+
+        public void ActivateSpeedBoost(float duration, float multiplier)
+        {
+            speedBoostUntil = Mathf.Max(speedBoostUntil, Time.time + Mathf.Max(.1f, duration));
+            speedBoostMultiplier = Mathf.Max(speedBoostMultiplier, Mathf.Max(1f, multiplier));
+        }
 
         [Header("Movement Bounds")]
         [SerializeField] private MovementBounds2D movementBounds;
@@ -180,7 +196,15 @@ namespace GameJamOcean.Player
             UpdateAnimation();
         }
 
-        private void OnDamaged(Health target, GameObject source) => hitTime = Time.time;
+        private void OnDamaged(Health target, GameObject source)
+        {
+            hitTime = Time.time;
+            if (spriteRenderer == null) return;
+            Vector3 top = spriteRenderer.bounds.center
+                + Vector3.up * (spriteRenderer.bounds.extents.y + .2f);
+            DiveFeedbackParticle.SpawnPlayerHealthChange(top, false,
+                spriteRenderer.sortingLayerID, spriteRenderer.sortingOrder);
+        }
 
         private void LateUpdate()
         {
@@ -192,17 +216,25 @@ namespace GameJamOcean.Player
         private void FixedUpdate()
         {
             if (health != null && health.IsDead) { diverRigidbody.linearVelocity = Vector2.zero; return; }
+            float activeMaximumSpeed = maximumSpeed
+                * (Time.time < speedBoostUntil ? speedBoostMultiplier : 1f);
+            if (Time.time < knockbackUntil)
+            {
+                diverRigidbody.linearVelocity = knockbackVelocity;
+                ApplyMovementBounds();
+                return;
+            }
             if (IsDashing)
             {
                 Vector2 perpendicular = new(-dashDirection.y, dashDirection.x);
                 float steering = Mathf.Clamp(Vector2.Dot(moveInput, perpendicular), -1f, 1f);
                 Vector2 desired = (dashDirection + perpendicular * (steering * Mathf.Tan(dashSteeringAngle * Mathf.Deg2Rad))).normalized;
                 dashHeading = Vector3.RotateTowards(dashHeading, desired, dashSteeringSpeed * Mathf.Deg2Rad * Time.fixedDeltaTime, 0f);
-                diverRigidbody.linearVelocity = dashHeading * maximumSpeed * dashSpeedMultiplier;
+                diverRigidbody.linearVelocity = dashHeading * activeMaximumSpeed * dashSpeedMultiplier;
                 ApplyMovementBounds();
                 return;
             }
-            Vector2 desiredVelocity = moveInput * maximumSpeed;
+            Vector2 desiredVelocity = moveInput * activeMaximumSpeed;
             float speedChange = moveInput.sqrMagnitude > InputDeadZone
                 ? acceleration
                 : deceleration;

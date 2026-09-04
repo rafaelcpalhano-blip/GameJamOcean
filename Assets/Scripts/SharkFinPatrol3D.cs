@@ -41,6 +41,8 @@ namespace GameJamOcean.World
         [Header("Physical collision")]
         [SerializeField, Min(.1f)] private float bodyMass = 2f;
         [SerializeField, Min(.05f)] private float aimDuration = .25f;
+        [Header("Appearance")]
+        [SerializeField] private Color finColor = new Color(.3f, .34f, .38f, 1f);
         private BoatWaterBounds3D water;
         private GameJamOcean.Spawning.DiveSpawnExclusionCircle3D[] exclusions;
 
@@ -57,6 +59,7 @@ namespace GameJamOcean.World
         private void Start()
         {
             home = transform.position;
+            ApplyFinColor();
             fullDiveDepth = diveDepth;
             foreach (var visual in GetComponentsInChildren<Renderer>())
                 fullDiveDepth = Mathf.Max(fullDiveDepth, visual.bounds.max.y - home.y + .35f);
@@ -78,6 +81,19 @@ namespace GameJamOcean.World
             ChoosePoint();
             nextDive = Time.time + Random.Range(1f, 4f);
             nextAttack = Time.time + 2f;
+        }
+
+        private void ApplyFinColor()
+        {
+            var properties = new MaterialPropertyBlock();
+            foreach (Renderer visual in GetComponentsInChildren<Renderer>(true))
+            {
+                visual.GetPropertyBlock(properties);
+                properties.SetColor("_BaseColor", finColor);
+                properties.SetColor("_Color", finColor);
+                visual.SetPropertyBlock(properties);
+                properties.Clear();
+            }
         }
         private bool Allowed(Vector3 p, bool pursuing = false)
         {

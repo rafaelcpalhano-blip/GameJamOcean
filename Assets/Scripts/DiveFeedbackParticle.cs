@@ -17,19 +17,35 @@ namespace GameJamOcean.Combat
 
         public static void SpawnDamage(Vector3 position, float amount, int sortingLayer, int sortingOrder, float duration = 0.8f)
         {
-            var go = new GameObject("Damage number");
+            SpawnNumber(position,
+                amount.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
+                new Color(1f, 0.9f, 0.35f), sortingLayer, sortingOrder, duration);
+        }
+
+        public static void SpawnPlayerHealthChange(Vector3 position, bool healing,
+            int sortingLayer, int sortingOrder, float duration = 0.9f)
+        {
+            SpawnNumber(position, healing ? "+1" : "-1",
+                healing ? new Color(.2f, 1f, .3f) : new Color(1f, .15f, .15f),
+                sortingLayer, sortingOrder, duration);
+        }
+
+        private static void SpawnNumber(Vector3 position, string text, Color tint,
+            int sortingLayer, int sortingOrder, float duration)
+        {
+            var go = new GameObject("Health number");
             go.transform.position = position + new Vector3(Random.Range(-0.15f, 0.15f), 0, -0.1f);
             var effect = go.AddComponent<DiveFeedbackParticle>();
             effect.label = go.AddComponent<TextMeshPro>();
             effect.label.font = TMP_Settings.defaultFontAsset;
-            effect.label.text = amount.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+            effect.label.text = text;
             effect.label.fontSize = 5;
             effect.label.alignment = TextAlignmentOptions.Center;
             effect.label.rectTransform.sizeDelta = new Vector2(3, 1);
             var renderer = go.GetComponent<MeshRenderer>();
             renderer.sortingLayerID = sortingLayer;
             renderer.sortingOrder = sortingOrder + 20;
-            effect.Initialize(duration, new Color(1f, 0.9f, 0.35f));
+            effect.Initialize(duration, tint);
         }
 
         public static void SpawnBubble(Vector3 position, SpriteRenderer source, float duration)

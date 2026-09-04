@@ -30,6 +30,8 @@ namespace GameJamOcean.Spawning
         [SerializeField, Min(1)] private int positionAttempts = 30;
         [SerializeField, Min(0f)] private float obstacleCheckRadius = 0.25f;
         [SerializeField] private LayerMask blockingLayers;
+        [Header("End of Dive")]
+        [SerializeField, Min(.1f)] private float uncollectedFadeDuration = .75f;
 
         [Header("Runtime")]
         [SerializeField] private int totalSpawned;
@@ -42,6 +44,17 @@ namespace GameJamOcean.Spawning
         private void Awake()
         {
             FindReferencesIfNeeded();
+        }
+
+        private void OnEnable()
+        {
+            FindReferencesIfNeeded();
+            if (sessionManager != null) sessionManager.FinalChestReady += FadeUncollectedGold;
+        }
+
+        private void OnDisable()
+        {
+            if (sessionManager != null) sessionManager.FinalChestReady -= FadeUncollectedGold;
         }
 
         private IEnumerator Start()
@@ -167,6 +180,15 @@ namespace GameJamOcean.Spawning
             totalCollected++;
         }
 
+        private void FadeUncollectedGold()
+        {
+            RemoveMissingReferences();
+            foreach (GoldCollectible2D collectible in activeGold)
+                if (collectible != null) collectible.FadeOutAndDestroy(uncollectedFadeDuration);
+            activeGold.Clear();
+            currentlyAlive = 0;
+        }
+
         private void RemoveMissingReferences()
         {
             activeGold.RemoveAll(item => item == null);
@@ -210,6 +232,7 @@ namespace GameJamOcean.Spawning
             minimumGoldSeparation = Mathf.Max(0f, minimumGoldSeparation);
             positionAttempts = Mathf.Max(1, positionAttempts);
             obstacleCheckRadius = Mathf.Max(0f, obstacleCheckRadius);
+            uncollectedFadeDuration = Mathf.Max(.1f, uncollectedFadeDuration);
         }
 
         private void OnDrawGizmosSelected()
