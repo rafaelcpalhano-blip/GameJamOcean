@@ -239,10 +239,32 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 61f612c5560aca04ea06ff3a44c563da, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameJamOcean.Diving.DiveSessionManager
-  totalEnemies: 4
+  totalEnemies: 27
   difficultyLevel: 0
   beginAutomatically: 1
   registerEnemiesAlreadyInScene: 1
+  useUpgradeDifficulty: 1
+  difficultyTiers:
+  - minimumPurchasedUpgrades: 0
+    initialEnemies: 10
+    totalEnemies: 27
+    enemyWeights: [40, 30, 20, 5, 5]
+  - minimumPurchasedUpgrades: 3
+    initialEnemies: 12
+    totalEnemies: 30
+    enemyWeights: [20, 30, 30, 10, 10]
+  - minimumPurchasedUpgrades: 6
+    initialEnemies: 14
+    totalEnemies: 33
+    enemyWeights: [10, 35, 25, 15, 15]
+  - minimumPurchasedUpgrades: 9
+    initialEnemies: 15
+    totalEnemies: 37
+    enemyWeights: [10, 25, 25, 25, 25]
+  - minimumPurchasedUpgrades: 12
+    initialEnemies: 16
+    totalEnemies: 42
+    enemyWeights: [15, 15, 10, 30, 30]
   chestMilestones:
   - 25
   - 50
@@ -1946,18 +1968,23 @@ MonoBehaviour:
   spawnedEnemiesParent: {fileID: 1613636309}
   enemies:
   - prefab: {fileID: 2213202573781266297, guid: 9c5d683240f465847b6552aa4baa0a5a, type: 3}
+    species: 2
     weight: 1
     minimumDifficultyLevel: 0
   - prefab: {fileID: 6740553679286364748, guid: dfa48fca84db97c4bb44e1a5d14c31fc, type: 3}
+    species: 1
     weight: 1
     minimumDifficultyLevel: 0
   - prefab: {fileID: 419182537058929491, guid: f39ad98778f515a46b0303e45a9818ab, type: 3}
+    species: 3
     weight: 1
     minimumDifficultyLevel: 0
   - prefab: {fileID: 3829731525909844868, guid: f5ec67ec0150d11468e37ac9002b53f3, type: 3}
+    species: 5
     weight: 1
     minimumDifficultyLevel: 0
   - prefab: {fileID: 5437784845823516924, guid: e884554ace34ccc418db4f63483e99b2, type: 3}
+    species: 4
     weight: 1
     minimumDifficultyLevel: 0
   spawnPoints:
@@ -3026,6 +3053,15 @@ MonoBehaviour:
   maximumSpeed: 4.5
   acceleration: 10
   deceleration: 14
+  hitImmunitySeconds: 1.5
+  hitBlinks: 3
+  dashCooldown: 5
+  dashSteeringAngle: 30
+  dashSteeringSpeed: 240
+  dashDuration: 0.25
+  dashSpeedMultiplier: 3
+  bubbleInterval: 0.035
+  bubbleLifetime: 1.2
   movementBounds: {fileID: 374188107}
   boundsPadding: 0.05
   animator: {fileID: 1745452232}

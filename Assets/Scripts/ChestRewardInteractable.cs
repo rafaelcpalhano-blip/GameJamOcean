@@ -44,6 +44,10 @@ namespace GameJamOcean.Rewards
         [SerializeField] private Animator animator;
         [SerializeField] private string openTriggerName = "Open";
 
+        [Header("Opening Reward Feedback")]
+        [SerializeField] private Sprite rewardCoinSprite;
+        [SerializeField, Min(1)] private int maximumVisualCoins = 18;
+        [SerializeField, Min(0.1f)] private float rewardEffectDuration = 1.2f;
         [Header("Lifetime")]
         [SerializeField] private bool destroyAfterOpening = true;
         [SerializeField, Min(0f)] private float destroyDelay = 1f;
@@ -157,6 +161,13 @@ namespace GameJamOcean.Rewards
 
             opened = true;
             awardedGold = Random.Range(minimumGold, maximumGold + 1);
+            SpriteRenderer visual = GetComponentInChildren<SpriteRenderer>();
+            Sprite chestIcon = visual != null ? visual.sprite : null;
+            if (rewardCoinSprite == null)
+                rewardCoinSprite = FindFirstObjectByType<GameJamOcean.Spawning.GoldSpawner2D>()?.CoinSprite;
+            ChestRewardBurst.Spawn(transform.position + Vector3.up * 0.4f, rewardCoinSprite,
+                awardedGold, maximumVisualCoins, rewardEffectDuration,
+                visual != null ? visual.sortingLayerID : 0, visual != null ? visual.sortingOrder : 0);
 
             if (animator != null)
             {
@@ -177,11 +188,12 @@ namespace GameJamOcean.Rewards
 
             if (chestType == ChestRewardType.Final)
             {
+                sessionManager.SetFinalChestIcon(chestIcon);
                 sessionManager.CollectFinalChest(awardedGold);
             }
             else
             {
-                sessionManager.AddSecuredGold(awardedGold);
+                sessionManager.RecordSmallChest(awardedGold, chestIcon);
             }
 
             onOpened?.Invoke(awardedGold);

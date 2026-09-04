@@ -55,6 +55,9 @@ namespace GameJamOcean.Enemies
         [SerializeField, Min(0f)] private float destroyDelay = 0f;
 
         [Header("Visual")]
+        [SerializeField] private bool showDamageNumbers = true;
+        [SerializeField, Min(0.1f)] private float damageNumberLifetime = 0.8f;
+        [SerializeField, Min(0f)] private float damageNumberHeight = 0.25f;
         [SerializeField] private SpriteRenderer spriteRenderer;
         [SerializeField] private bool spriteFacesRight = true;
 
@@ -271,6 +274,11 @@ namespace GameJamOcean.Enemies
 
         private void HandleDamaged(Health health, GameObject source)
         {
+            if (showDamageNumbers && spriteRenderer != null)
+            {
+                Vector3 top = spriteRenderer.bounds.center + Vector3.up * (spriteRenderer.bounds.extents.y + damageNumberHeight);
+                DiveFeedbackParticle.SpawnDamage(top, health.LastDamageAmount, spriteRenderer.sortingLayerID, spriteRenderer.sortingOrder, damageNumberLifetime);
+            }
             if (health.CurrentHealth > 0f)
             {
                 PlayActionAnimation(hurtStateHash, hurtAnimationDuration);

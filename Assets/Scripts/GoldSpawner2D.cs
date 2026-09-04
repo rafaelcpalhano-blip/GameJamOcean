@@ -37,6 +37,7 @@ namespace GameJamOcean.Spawning
         [SerializeField] private int totalCollected;
 
         private readonly List<GoldCollectible2D> activeGold = new();
+        public Sprite CoinSprite => goldPrefab != null ? goldPrefab.GetComponentInChildren<SpriteRenderer>()?.sprite : null;
 
         private void Awake()
         {

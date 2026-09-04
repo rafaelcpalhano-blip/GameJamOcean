@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using GameJamOcean.Combat;
 using GameJamOcean.Enemies;
 using GameJamOcean.Player;
+using GameJamOcean.Progression;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -25,6 +26,17 @@ namespace GameJamOcean.Diving
         [SerializeField, Min(0)] private int difficultyLevel;
         [SerializeField] private bool beginAutomatically = true;
         [SerializeField] private bool registerEnemiesAlreadyInScene = true;
+        [Header("Progression Difficulty (N1 to N5)")]
+        [SerializeField] private bool useUpgradeDifficulty = true;
+        [SerializeField] private DiveDifficultyTier[] difficultyTiers =
+        {
+            new(0, 10, 27, 40, 30, 20, 5, 5),
+            new(3, 12, 30, 20, 30, 30, 10, 10),
+            new(6, 14, 33, 10, 35, 25, 15, 15),
+            new(9, 15, 37, 10, 25, 25, 25, 25),
+            new(12, 16, 42, 15, 15, 10, 30, 30)
+        };
+        public DiveDifficultyTier ActiveDifficulty { get; private set; }
 
         [Header("Chest Milestones (%)")]
         [SerializeField] private List<float> chestMilestones = new() { 25f, 50f, 75f, 100f };
@@ -77,6 +89,17 @@ namespace GameJamOcean.Diving
         public int SecuredGold => securedGold;
         public int CollectedCoinGold => collectedCoinGold;
         public int FinalRewardGold => finalRewardGold;
+        public int OpenedSmallChests { get; private set; }
+        public Sprite SmallChestIcon { get; private set; }
+        public Sprite FinalChestIcon { get; private set; }
+        public void RecordSmallChest(int gold, Sprite icon)
+        {
+            if (sessionState != DiveSessionState.Running && sessionState != DiveSessionState.AwaitingFinalChest) return;
+            OpenedSmallChests++;
+            SmallChestIcon = icon;
+            AddSecuredGold(gold);
+        }
+        public void SetFinalChestIcon(Sprite icon) => FinalChestIcon = icon;
         public int TotalCollectedGold => securedGold + collectedCoinGold + finalRewardGold;
         public float CompletionPercentage => completionPercentage;
         public DiveSessionState SessionState => sessionState;
@@ -122,6 +145,19 @@ namespace GameJamOcean.Diving
 
         public void BeginSession()
         {
+            if (sessionState != DiveSessionState.NotStarted) return;
+            if (useUpgradeDifficulty && difficultyTiers != null && difficultyTiers.Length > 0)
+            {
+                int points = 0;
+                if (GameProgress.HasInstance)
+                    foreach (UpgradeKind kind in Enum.GetValues(typeof(UpgradeKind))) points += GameProgress.Instance.GetLevel(kind) - 1;
+                int[] thresholds = new int[difficultyTiers.Length];
+                for (int i = 0; i < difficultyTiers.Length; i++)
+                    thresholds[i] = difficultyTiers[i] != null ? difficultyTiers[i].minimumPurchasedUpgrades : -1;
+                int selected = DiveDifficultyRules.SelectTier(points, thresholds);
+                if (selected >= 0) { ActiveDifficulty = difficultyTiers[selected]; difficultyLevel = selected + 1; }
+                if (ActiveDifficulty != null) totalEnemies = Mathf.Max(1, ActiveDifficulty.totalEnemies);
+            }
             UnsubscribeFromAllEnemies();
             registeredEnemies.Clear();
 

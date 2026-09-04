@@ -11,6 +11,12 @@ namespace GameJamOcean.Combat
         [SerializeField, Min(1f)] private float maximumHealth = 5f;
         [SerializeField, Min(0f)] private float currentHealth;
         [SerializeField] private bool restoreOnEnable = true;
+        [SerializeField, Min(0f)] private float damageImmunityDuration;
+        private float immuneUntil;
+        public bool DamageBlocked { get; set; }
+        public float LastDamageAmount { get; private set; }
+        public bool IsImmune => Time.time < immuneUntil;
+        public void ConfigureDamageImmunity(float duration) => damageImmunityDuration = Mathf.Max(0f, duration);
 
         [Header("Events")]
         [SerializeField] private UnityEvent onDamaged;
@@ -42,11 +48,13 @@ namespace GameJamOcean.Combat
 
         public void TakeDamage(float amount, GameObject source)
         {
-            if (IsDead || amount <= 0f)
+            if (IsDead || DamageBlocked || IsImmune || amount <= 0f || float.IsNaN(amount) || float.IsInfinity(amount))
             {
                 return;
             }
 
+            immuneUntil = Time.time + damageImmunityDuration;
+            LastDamageAmount = amount;
             currentHealth = Mathf.Max(0f, currentHealth - amount);
             HealthChanged?.Invoke(this);
             onDamaged?.Invoke();
@@ -90,6 +98,8 @@ namespace GameJamOcean.Combat
 
         public void Restore()
         {
+            immuneUntil = 0f;
+            DamageBlocked = false;
             currentHealth = maximumHealth;
             IsDead = false;
             HealthChanged?.Invoke(this);

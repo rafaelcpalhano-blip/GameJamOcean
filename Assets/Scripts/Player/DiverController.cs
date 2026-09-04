@@ -23,6 +23,28 @@ namespace GameJamOcean.Player
         [SerializeField, Min(0f)] private float acceleration = 10f;
         [SerializeField, Min(0f)] private float deceleration = 14f;
 
+        [Header("Damage Feedback")]
+        [SerializeField, Min(0.1f)] private float hitImmunitySeconds = 1.5f;
+        [SerializeField, Min(1)] private int hitBlinks = 3;
+        [Header("Dash (Shift)")]
+        [SerializeField, Min(0.1f)] private float dashCooldown = 5f;
+        [SerializeField, Range(0f, 40f)] private float dashSteeringAngle = 30f;
+        [SerializeField, Min(1f)] private float dashSteeringSpeed = 240f;
+        private Vector2 dashHeading;
+        [SerializeField, Min(0.05f)] private float dashDuration = 0.25f;
+        [SerializeField, Min(1f)] private float dashSpeedMultiplier = 3f;
+        [SerializeField, Min(0.02f)] private float bubbleInterval = 0.035f;
+        [SerializeField, Min(0.1f)] private float bubbleLifetime = 1.2f;
+        private Health health;
+        private float hitTime = float.NegativeInfinity;
+        private float dashUntil;
+        private float nextDashTime;
+        private float nextBubbleTime;
+        private Vector2 lastDirection = Vector2.down;
+        private Vector2 dashDirection;
+        public float DashCooldownRemaining => Mathf.Max(0f, nextDashTime - Time.time);
+        public bool IsDashing => enabled && Time.time < dashUntil;
+
         [Header("Movement Bounds")]
         [SerializeField] private MovementBounds2D movementBounds;
         [SerializeField, Min(0f)] private float boundsPadding = 0.05f;
@@ -50,6 +72,8 @@ namespace GameJamOcean.Player
         {
             diverRigidbody = GetComponent<Rigidbody2D>();
             diverCollider = GetComponent<Collider2D>();
+            health = GetComponent<Health>();
+            if (health != null) health.ConfigureDamageImmunity(hitImmunitySeconds);
 
             if (movementBounds == null)
             {
@@ -75,6 +99,7 @@ namespace GameJamOcean.Player
 
         private void OnEnable()
         {
+            if (health != null) health.Damaged += OnDamaged;
             if (moveAction == null)
             {
                 Debug.LogError(
@@ -112,6 +137,10 @@ namespace GameJamOcean.Player
 
         private void OnDisable()
         {
+            if (health != null) health.Damaged -= OnDamaged;
+            if (spriteRenderer != null) spriteRenderer.enabled = true;
+            hitTime = float.NegativeInfinity;
+            dashUntil = 0f;
             moveInput = Vector2.zero;
 
             if (diverRigidbody != null)
@@ -130,11 +159,48 @@ namespace GameJamOcean.Player
         private void Update()
         {
             moveInput = Vector2.ClampMagnitude(moveAction.action.ReadValue<Vector2>(), 1f);
+            if (Time.timeScale > 0f && (health == null || !health.IsDead))
+            {
+                if (moveInput.sqrMagnitude > InputDeadZone) lastDirection = moveInput.normalized;
+                if (Keyboard.current != null && (Keyboard.current.leftShiftKey.wasPressedThisFrame || Keyboard.current.rightShiftKey.wasPressedThisFrame)
+                    && Time.time >= nextDashTime)
+                {
+                    dashDirection = lastDirection;
+                    dashHeading = dashDirection;
+                    dashUntil = Time.time + dashDuration;
+                    nextDashTime = Time.time + dashCooldown;
+                }
+                if (IsDashing && Time.time >= nextBubbleTime)
+                {
+                    DiveFeedbackParticle.SpawnBubble(transform.position, spriteRenderer, bubbleLifetime);
+                    nextBubbleTime = Time.time + bubbleInterval;
+                }
+            }
             UpdateAnimation();
+        }
+
+        private void OnDamaged(Health target, GameObject source) => hitTime = Time.time;
+
+        private void LateUpdate()
+        {
+            float elapsed = Time.time - hitTime;
+            spriteRenderer.enabled = elapsed >= hitImmunitySeconds
+                || Mathf.FloorToInt(elapsed / hitImmunitySeconds * hitBlinks * 2) % 2 == 1;
         }
 
         private void FixedUpdate()
         {
+            if (health != null && health.IsDead) { diverRigidbody.linearVelocity = Vector2.zero; return; }
+            if (IsDashing)
+            {
+                Vector2 perpendicular = new(-dashDirection.y, dashDirection.x);
+                float steering = Mathf.Clamp(Vector2.Dot(moveInput, perpendicular), -1f, 1f);
+                Vector2 desired = (dashDirection + perpendicular * (steering * Mathf.Tan(dashSteeringAngle * Mathf.Deg2Rad))).normalized;
+                dashHeading = Vector3.RotateTowards(dashHeading, desired, dashSteeringSpeed * Mathf.Deg2Rad * Time.fixedDeltaTime, 0f);
+                diverRigidbody.linearVelocity = dashHeading * maximumSpeed * dashSpeedMultiplier;
+                ApplyMovementBounds();
+                return;
+            }
             Vector2 desiredVelocity = moveInput * maximumSpeed;
             float speedChange = moveInput.sqrMagnitude > InputDeadZone
                 ? acceleration
@@ -175,6 +241,9 @@ namespace GameJamOcean.Player
             }
 
             diverRigidbody.position = clampedPosition;
+            // Clamp the next physics step too: a fast dash must not cross DiveArea.
+            Vector2 next = movementBounds.ClampPoint(clampedPosition + velocity * Time.fixedDeltaTime, extents);
+            velocity = (next - clampedPosition) / Time.fixedDeltaTime;
             diverRigidbody.linearVelocity = velocity;
         }
 
@@ -232,6 +301,12 @@ namespace GameJamOcean.Player
             transitionDuration = Mathf.Max(0f, transitionDuration);
             animationSpeedChange = Mathf.Max(0f, animationSpeedChange);
             boundsPadding = Mathf.Max(0f, boundsPadding);
+            hitImmunitySeconds = Mathf.Max(0.1f, hitImmunitySeconds);
+            hitBlinks = Mathf.Max(1, hitBlinks);
+            dashDuration = Mathf.Max(0.05f, dashDuration);
+            dashCooldown = Mathf.Max(dashDuration, dashCooldown);
+            dashSpeedMultiplier = Mathf.Max(1f, dashSpeedMultiplier);
+            if (Application.isPlaying && health != null) health.ConfigureDamageImmunity(hitImmunitySeconds);
         }
     }
 }

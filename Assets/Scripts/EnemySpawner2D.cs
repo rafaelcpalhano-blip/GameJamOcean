@@ -11,17 +11,35 @@ namespace GameJamOcean.Spawning
     [Serializable]
     public sealed class EnemySpawnEntry
     {
+        [Tooltip("Auto recognizes the existing prefab names. Otherwise select the explicit type.")]
+        [SerializeField] private EnemySpecies species;
         [SerializeField] private EnemyController2D prefab;
         [SerializeField, Min(0.01f)] private float weight = 1f;
         [SerializeField, Min(0)] private int minimumDifficultyLevel;
 
         public EnemyController2D Prefab => prefab;
         public float Weight => Mathf.Max(0.01f, weight);
+        public int SpeciesIndex
+        {
+            get
+            {
+                if (species != EnemySpecies.Auto) return (int)species - 1;
+                string n = prefab != null ? prefab.name.ToLowerInvariant().Replace(" ", "") : "";
+                if (n.Contains("aguaviva")) return 0;
+                if (n.Contains("peixeespada")) return 1;
+                if (n.Contains("polvo")) return 2;
+                if (n.Contains("sereiamaga")) return 3;
+                if (n.Contains("sereiaguerreira")) return 4;
+                return -1;
+            }
+        }
         public bool IsAvailableAt(int difficultyLevel)
         {
             return prefab != null && difficultyLevel >= minimumDifficultyLevel;
         }
     }
+
+    public enum EnemySpecies { Auto, AguaViva, PeixeEspada, Polvo, SereiaMaga, SereiaGuerreira }
 
     [DisallowMultipleComponent]
     public sealed class EnemySpawner2D : MonoBehaviour
@@ -47,8 +65,22 @@ namespace GameJamOcean.Spawning
         [SerializeField, Min(0.05f)] private float baseSpawnInterval = 2f;
         [SerializeField, Min(0f)] private float intervalReductionPerDifficulty = 0.1f;
         [SerializeField, Min(0.05f)] private float minimumSpawnInterval = 0.4f;
+        [Header("Adaptive Pressure")]
+        [SerializeField, Min(0.1f)] private float killWindowSeconds = 5f;
+        [SerializeField, Min(1)] private int fastKillThreshold = 3;
+        [SerializeField, Min(0.1f)] private float fastSpawnInterval = 0.75f;
+        [SerializeField, Min(0f)] private float spawnPointScatterRadius = 3f;
+        private readonly Queue<float> recentKills = new();
+        private readonly List<EnemySpawnEntry> spawnPlan = new();
+        private readonly List<Vector3> reservedPositions = new();
+        private readonly List<EnemyController2D> liveSpawned = new();
+        private int planIndex;
+        private int lastKilled;
+        private int initialTarget;
+        private bool sessionPrepared;
+        private float lastSpawnTime;
 
-        [Header("Simultaneous Enemies")]
+        [Header("Legacy Simultaneous Limit (without upgrade difficulty)")]
         [SerializeField, Min(1)] private int baseMaximumAlive = 3;
         [SerializeField, Min(0)] private int additionalAlivePerDifficulty = 1;
 
@@ -61,7 +93,6 @@ namespace GameJamOcean.Spawning
         [Header("Events")]
         [SerializeField] private UnityEvent<GameObject> onEnemySpawned;
 
-        private readonly List<Transform> validSpawnPoints = new();
         private readonly List<EnemySpawnEntry> availableEnemies = new();
         private bool warnedAboutConfiguration;
 
@@ -72,12 +103,54 @@ namespace GameJamOcean.Spawning
 
         private void Start()
         {
+            if (sessionManager != null) sessionManager.SessionStarted += PrepareSession;
+            if (sessionManager != null && sessionManager.SessionState == DiveSessionState.Running) PrepareSession();
+        }
+
+        private void OnDestroy()
+        { if (sessionManager != null) sessionManager.SessionStarted -= PrepareSession; }
+
+        private void PrepareSession()
+        {
+            if (sessionPrepared) return;
             RefreshDifficultySettings();
-            nextSpawnTime = Time.time + initialDelay;
+            var tier = sessionManager.ActiveDifficulty;
+            initialTarget = tier != null ? Mathf.Clamp(tier.initialEnemies, 1, sessionManager.TotalEnemies) : 0;
+            spawnPlan.Clear(); planIndex = 0; recentKills.Clear(); lastKilled = sessionManager.KilledEnemies;
+            if (tier != null)
+            {
+                // Fail visibly rather than silently changing the requested species distribution.
+                if (tier.enemyWeights == null || tier.enemyWeights.Length != 5)
+                { Debug.LogError("Dive difficulty needs five enemy weights.", this); enabled = false; return; }
+                int[] quotas;
+                try { quotas = DiveDifficultyRules.Allocate(sessionManager.RemainingEnemiesToSpawn, tier.enemyWeights); }
+                catch (ArgumentException error) { Debug.LogError(error.Message, this); enabled = false; return; }
+                for (int type = 0; type < 5; type++)
+                {
+                    var entry = availableEnemies.Find(e => e.SpeciesIndex == type);
+                    if (quotas[type] > 0 && entry == null)
+                    { Debug.LogError($"Missing enemy prefab for {(EnemySpecies)(type + 1)}.", this); enabled = false; return; }
+                    for (int i = 0; i < quotas[type]; i++) spawnPlan.Add(entry);
+                }
+                for (int i = spawnPlan.Count - 1; i > 0; i--)
+                { int j = UnityEngine.Random.Range(0, i + 1); (spawnPlan[i], spawnPlan[j]) = (spawnPlan[j], spawnPlan[i]); }
+            }
+            sessionPrepared = true;
+            SpawnInitialEnemies();
+            lastSpawnTime = Time.time;
+            nextSpawnTime = Time.time + (tier != null ? baseSpawnInterval : initialDelay);
+        }
+
+        private void SpawnInitialEnemies()
+        {
+            reservedPositions.Clear();
+            while (sessionManager.CanSpawnEnemy && sessionManager.SpawnedEnemies < initialTarget)
+                if (!TrySpawnEnemy()) break;
         }
 
         private void Update()
         {
+            if (!sessionPrepared || Time.timeScale <= 0f) return;
             if (sessionManager == null)
             {
                 FindReferencesIfNeeded();
@@ -89,17 +162,36 @@ namespace GameJamOcean.Spawning
                 return;
             }
 
+            while (lastKilled < sessionManager.KilledEnemies) { recentKills.Enqueue(Time.time); lastKilled++; }
+            while (recentKills.Count > 0 && Time.time - recentKills.Peek() > killWindowSeconds) recentKills.Dequeue();
+            if (sessionManager.ActiveDifficulty != null)
+            {
+                currentSpawnInterval = recentKills.Count >= fastKillThreshold
+                    ? Mathf.Max(0.1f, Mathf.Min(baseSpawnInterval, fastSpawnInterval)) : baseSpawnInterval;
+                nextSpawnTime = lastSpawnTime + currentSpawnInterval;
+            }
+
             if (Time.time < nextSpawnTime)
             {
                 return;
             }
 
+            reservedPositions.Clear();
+            if (sessionManager.SpawnedEnemies < initialTarget)
+            {
+                SpawnInitialEnemies();
+                lastSpawnTime = Time.time;
+                nextSpawnTime = Time.time + currentSpawnInterval;
+                return;
+            }
             if (TrySpawnEnemy())
             {
+                lastSpawnTime = Time.time;
                 nextSpawnTime = Time.time + currentSpawnInterval;
             }
             else
             {
+                lastSpawnTime = Time.time - currentSpawnInterval + Mathf.Min(0.5f, currentSpawnInterval);
                 nextSpawnTime = Time.time + Mathf.Min(0.5f, currentSpawnInterval);
             }
         }
@@ -115,6 +207,8 @@ namespace GameJamOcean.Spawning
             currentSpawnInterval = Mathf.Max(
                 minimumSpawnInterval,
                 baseSpawnInterval - currentDifficulty * intervalReductionPerDifficulty);
+            if (sessionManager != null && sessionManager.ActiveDifficulty != null)
+            { currentMaximumAlive = sessionManager.TotalEnemies; currentSpawnInterval = baseSpawnInterval; }
 
             RebuildAvailableEnemyList();
         }
@@ -126,15 +220,14 @@ namespace GameJamOcean.Spawning
                 return false;
             }
 
-            RebuildValidSpawnPointList();
-            if (validSpawnPoints.Count == 0 || availableEnemies.Count == 0)
+            if (!TryGetSpawnPosition(out Vector3 spawnPosition) || availableEnemies.Count == 0)
             {
                 WarnAboutInvalidConfiguration();
                 return false;
             }
 
-            Transform spawnPoint = validSpawnPoints[UnityEngine.Random.Range(0, validSpawnPoints.Count)];
-            EnemySpawnEntry entry = ChooseWeightedEnemy();
+            EnemySpawnEntry entry = sessionManager.ActiveDifficulty != null
+                ? (planIndex < spawnPlan.Count ? spawnPlan[planIndex] : null) : ChooseWeightedEnemy();
             if (entry == null)
             {
                 return false;
@@ -142,7 +235,7 @@ namespace GameJamOcean.Spawning
 
             EnemyController2D enemy = Instantiate(
                 entry.Prefab,
-                spawnPoint.position,
+                spawnPosition,
                 Quaternion.identity,
                 spawnedEnemiesParent);
 
@@ -152,9 +245,33 @@ namespace GameJamOcean.Spawning
                 return false;
             }
 
+            planIndex++;
+            reservedPositions.Add(spawnPosition);
+            liveSpawned.Add(enemy);
             onEnemySpawned?.Invoke(enemy.gameObject);
             warnedAboutConfiguration = false;
             return true;
+        }
+
+        private bool TryGetSpawnPosition(out Vector3 position)
+        {
+            position = Vector3.zero;
+            if (spawnPoints.Count == 0) return false;
+            liveSpawned.RemoveAll(e => e == null);
+            for (int attempt = 0; attempt < 150; attempt++)
+            {
+                Transform point = spawnPoints[UnityEngine.Random.Range(0, spawnPoints.Count)];
+                if (point == null) continue;
+                position = point.position + (Vector3)(UnityEngine.Random.insideUnitCircle * spawnPointScatterRadius);
+                if (!IsOutsideCamera(position) || (player != null && Vector2.Distance(position, player.position) < minimumPlayerDistance)) continue;
+                Vector3 candidate = position;
+                bool occupied = reservedPositions.Exists(p => Vector2.Distance(p, candidate) < occupancyCheckRadius * 2)
+                    || liveSpawned.Exists(e => Vector2.Distance(e.transform.position, candidate) < occupancyCheckRadius * 2);
+                if (occupied) continue;
+                if (occupancyLayers.value != 0 && Physics2D.OverlapCircle(position, occupancyCheckRadius, occupancyLayers) != null) continue;
+                return true;
+            }
+            return false;
         }
 
         private void FindReferencesIfNeeded()
@@ -189,34 +306,6 @@ namespace GameJamOcean.Spawning
                 {
                     availableEnemies.Add(entry);
                 }
-            }
-        }
-
-        private void RebuildValidSpawnPointList()
-        {
-            validSpawnPoints.Clear();
-
-            foreach (Transform spawnPoint in spawnPoints)
-            {
-                if (spawnPoint == null || !IsOutsideCamera(spawnPoint.position))
-                {
-                    continue;
-                }
-
-                if (player != null && Vector2.Distance(spawnPoint.position, player.position) < minimumPlayerDistance)
-                {
-                    continue;
-                }
-
-                if (occupancyLayers.value != 0 && Physics2D.OverlapCircle(
-                        spawnPoint.position,
-                        occupancyCheckRadius,
-                        occupancyLayers) != null)
-                {
-                    continue;
-                }
-
-                validSpawnPoints.Add(spawnPoint);
             }
         }
 
