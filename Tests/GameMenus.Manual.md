@@ -85,7 +85,10 @@ O volume geral usa AudioListener.volume e já valerá para futuros AudioSources.
   respeitando 0,75 s de intervalo por rocha, inclusive com múltiplos colisores.
   Conferir também as rochas de aldeias inicialmente inativas após upgrade.
 - As rochas recebem configuração em runtime, identificadas por Rock/Rocks e
-  variantes de instância. Se não houver colisores, são criados MeshColliders.
+  variantes de instância. Se não houver colisores, são criados BoxColliders
+  usando centro/tamanho local das malhas, sem exigir Read/Write. Colisores já
+  configurados são preservados. Em nova build Web, confirmar ausência do erro
+  CollisionMeshData e testar colisão/dano também nas pedras rotacionadas/escaladas.
   Verificar fisicamente todas as pedras na cena; nomes diferentes exigem configuração.
 - Assets/Resources/OceanAudioSettings contém os três clips e ganho de ambiente.
   Os arquivos de som em Assets/Artes estão ignorados pelo Git intencionalmente;

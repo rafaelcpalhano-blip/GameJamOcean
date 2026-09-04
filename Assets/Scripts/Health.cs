@@ -96,6 +96,15 @@ namespace GameJamOcean.Combat
             HealthChanged?.Invoke(this);
         }
 
+        public void SetCurrentHealth(float value)
+        {
+            immuneUntil = 0f;
+            DamageBlocked = false;
+            currentHealth = Mathf.Clamp(value, 0f, maximumHealth);
+            IsDead = currentHealth <= 0f;
+            HealthChanged?.Invoke(this);
+        }
+
         public void Restore()
         {
             immuneUntil = 0f;

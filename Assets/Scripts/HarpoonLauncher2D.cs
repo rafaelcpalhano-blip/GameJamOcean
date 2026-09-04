@@ -1,11 +1,16 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using System;
 
 namespace GameJamOcean.Weapons
 {
     [DisallowMultipleComponent]
     public sealed class HarpoonLauncher2D : MonoBehaviour
     {
+        public static event Action<Vector2, Vector2> HarpoonFired;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetEvents() => HarpoonFired = null;
         [Header("Input")]
         [SerializeField] private InputActionReference attackAction;
 
@@ -112,6 +117,7 @@ namespace GameJamOcean.Weapons
                 spawnPosition,
                 Quaternion.identity);
             harpoon.Launch(direction, gameObject);
+            HarpoonFired?.Invoke(spawnPosition, direction);
             GameJamOcean.Audio.GameAudio.Instance?.PlayHarpoon();
             nextFireTime = Time.time + fireCooldown + Mathf.Max(0f, additionalShotDelay);
         }

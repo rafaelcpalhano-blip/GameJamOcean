@@ -16,6 +16,13 @@ namespace GameJamOcean.Boat
         private Quaternion restRotation;
         private float elapsed;
         private bool hasRestPose;
+        [Header("Collision Impact")]
+        [SerializeField, Min(.05f)] private float impactDuration = .85f;
+        [SerializeField, Range(0f, 8f)] private float impactPitchDegrees = 3.2f;
+        [SerializeField, Range(0f, 8f)] private float impactRollDegrees = 4.5f;
+        [SerializeField, Range(0f, .3f)] private float impactLift = .08f;
+        private float impactStartedAt = float.NegativeInfinity;
+        private float impactSide = 1f;
 
         public void Configure(Transform model)
         {
@@ -46,12 +53,23 @@ namespace GameJamOcean.Boat
             elapsed += Time.deltaTime;
             float phase = elapsed * frequency * Mathf.PI * 2f;
             float strength = intensity * Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed));
+            float impactProgress = Mathf.Clamp01((Time.time - impactStartedAt) / impactDuration);
+            float impactEnvelope = (1f - impactProgress) * (1f - impactProgress);
+            float impactWave = Mathf.Sin(impactProgress * Mathf.PI * 3f) * impactEnvelope;
             visualModel.localPosition = restPosition
-                + Vector3.up * (Mathf.Sin(phase) * bobHeight * strength);
+                + Vector3.up * (Mathf.Sin(phase) * bobHeight * strength
+                    + Mathf.Abs(impactWave) * impactLift);
             visualModel.localRotation = restRotation * Quaternion.Euler(
-                Mathf.Sin(phase * 0.83f) * pitchDegrees * strength,
+                Mathf.Sin(phase * 0.83f) * pitchDegrees * strength + impactWave * impactPitchDegrees,
                 0f,
-                Mathf.Sin(phase * 0.67f + 0.8f) * rollDegrees * strength);
+                Mathf.Sin(phase * 0.67f + 0.8f) * rollDegrees * strength
+                    + impactWave * impactRollDegrees * impactSide);
+        }
+
+        public void PlayCollisionImpact(Vector3 worldPushDirection)
+        {
+            impactSide = Vector3.Dot(transform.right, worldPushDirection) >= 0f ? -1f : 1f;
+            impactStartedAt = Time.time;
         }
 
         private void OnDisable()

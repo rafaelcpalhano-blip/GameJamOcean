@@ -127,6 +127,15 @@ namespace GameJamOcean.CameraSystem
         [SerializeField, Range(0f, 0.5f)] private float pitchDegrees = 0.08f;
         [SerializeField, Range(0.05f, 0.5f)] private float motionFrequency = 0.18f;
 
+        [Header("Collision Impact")]
+        [SerializeField, Min(.05f)] private float impactDuration = .8f;
+        [SerializeField, Range(0f, 1f)] private float impactRecoilDistance = .65f;
+        [SerializeField, Range(0f, .3f)] private float impactShakeDistance = .14f;
+        [SerializeField, Range(0f, 3f)] private float impactRollDegrees = 1.2f;
+        [SerializeField, Min(1f)] private float impactShakeFrequency = 10f;
+        private float impactStartedAt = float.NegativeInfinity;
+        private Vector3 impactDirection;
+
         private Vector3 followVelocity;
         private Vector3 basePosition;
         private Quaternion baseRotation;
@@ -186,9 +195,26 @@ namespace GameJamOcean.CameraSystem
                     - Mathf.Abs(pitchDegrees * intensity)) : maximumLookUp;
             float appliedElevation = Mathf.Clamp(lookElevation, -maximumLookDown,
                 Mathf.Min(maximumLookUp, safeLookUp));
+            float impactProgress = Mathf.Clamp01((Time.time - impactStartedAt) / impactDuration);
+            float impactEnvelope = 1f - impactProgress;
+            float recoilPulse = Mathf.Sin(Mathf.PI * Mathf.Sqrt(impactProgress)) * impactEnvelope;
+            float shake = Mathf.Sin(impactProgress * impactShakeFrequency * Mathf.PI * 2f)
+                * impactEnvelope * impactEnvelope;
+            Vector3 impactOffset = impactDirection * (recoilPulse * impactRecoilDistance)
+                + (baseRotation * Vector3.right + baseRotation * Vector3.up * .45f)
+                    * (shake * impactShakeDistance);
             transform.SetPositionAndRotation(
-                basePosition + Vector3.up * (wave * bobHeight * intensity),
-                baseRotation * Quaternion.Euler(wave * pitchDegrees * intensity - appliedElevation, 0f, 0f));
+                basePosition + Vector3.up * (wave * bobHeight * intensity) + impactOffset,
+                baseRotation * Quaternion.Euler(wave * pitchDegrees * intensity - appliedElevation,
+                    0f, shake * impactRollDegrees));
+        }
+
+        public void PlayCollisionImpact(Vector3 worldPushDirection)
+        {
+            worldPushDirection.y = 0f;
+            impactDirection = worldPushDirection.sqrMagnitude > .001f
+                ? worldPushDirection.normalized : transform.forward;
+            impactStartedAt = Time.time;
         }
 
         private Vector3 GetRotatedOffset()

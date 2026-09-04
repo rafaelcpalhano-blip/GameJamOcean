@@ -28,8 +28,15 @@ namespace GameJamOcean.World
                     foreach (var mesh in rock.GetComponentsInChildren<MeshFilter>(true))
                     {
                         if (mesh.sharedMesh == null) continue;
-                        var collider = mesh.gameObject.AddComponent<MeshCollider>();
-                        collider.sharedMesh = mesh.sharedMesh;
+                        // Local bounds do not require CPU-readable vertices or runtime mesh cooking.
+                        // Attach on the mesh object so its rotation/scale also applies to the box.
+                        Bounds bounds = mesh.sharedMesh.bounds;
+                        var collider = mesh.gameObject.AddComponent<BoxCollider>();
+                        collider.center = bounds.center;
+                        collider.size = new Vector3(
+                            Mathf.Max(.01f, bounds.size.x),
+                            Mathf.Max(.01f, bounds.size.y),
+                            Mathf.Max(.01f, bounds.size.z));
                     }
                     colliders = rock.GetComponentsInChildren<Collider>(true);
                 }
@@ -42,6 +49,102 @@ namespace GameJamOcean.World
                     damage.ConfigureRock(clock);
                 }
             }
+        }
+    }
+
+    /// <summary>Keeps imported wind prefabs intact while making scene instances easier to read.</summary>
+    [DisallowMultipleComponent]
+    public sealed class WindVfxEnhancer3D : MonoBehaviour
+    {
+        [Header("Wind visibility")]
+        [SerializeField, Min(.1f)] private float particleAmount = 2f;
+        [SerializeField, Min(.1f)] private float visibility = 2.5f;
+        private bool applied;
+
+        public static void ConfigureScene(Scene scene)
+        {
+            foreach (GameObject root in scene.GetRootGameObjects())
+            foreach (Transform candidate in root.GetComponentsInChildren<Transform>(true))
+            {
+                bool supported = candidate.name.StartsWith("VFX_Wind_Flows_01")
+                    || candidate.name.StartsWith("VFX_Wind_Flows_Trails_01");
+                if (!supported || candidate.GetComponentInParent<WindVfxEnhancer3D>() != null) continue;
+                candidate.gameObject.AddComponent<WindVfxEnhancer3D>();
+            }
+        }
+
+        private void Start()
+        {
+            if (applied) return;
+            applied = true;
+            GetVisibleHeightRange(out float waterHeight, out float highestBuilding);
+            foreach (ParticleSystem particles in GetComponentsInChildren<ParticleSystem>(true))
+            {
+                var emission = particles.emission;
+                ParticleSystem.MinMaxCurve rate = emission.rateOverTime;
+                rate.curveMultiplier *= particleAmount;
+                emission.rateOverTime = rate;
+
+                var main = particles.main;
+                main.useUnscaledTime = true;
+                main.maxParticles = Mathf.CeilToInt(main.maxParticles * particleAmount);
+                ParticleSystem.MinMaxGradient color = main.startColor;
+                Color minimum = color.colorMin;
+                Color maximum = color.colorMax;
+                minimum.a = Mathf.Clamp01(minimum.a * visibility);
+                maximum.a = Mathf.Clamp01(maximum.a * visibility);
+                color.colorMin = minimum;
+                color.colorMax = maximum;
+                main.startColor = color;
+
+                var shape = particles.shape;
+                if (shape.enabled && shape.shapeType == ParticleSystemShapeType.Box)
+                {
+                    float centerHeight = (waterHeight + highestBuilding) * .5f;
+                    Vector3 bottomLocal = particles.transform.InverseTransformPoint(
+                        new Vector3(particles.transform.position.x, waterHeight, particles.transform.position.z));
+                    Vector3 topLocal = particles.transform.InverseTransformPoint(
+                        new Vector3(particles.transform.position.x, highestBuilding, particles.transform.position.z));
+                    Vector3 shapePosition = shape.position;
+                    shapePosition.y = (bottomLocal.y + topLocal.y) * .5f;
+                    shape.position = shapePosition;
+                    Vector3 shapeScale = shape.scale;
+                    shapeScale.y = Mathf.Max(.5f, Mathf.Abs(topLocal.y - bottomLocal.y));
+                    shape.scale = shapeScale;
+                }
+                if (!particles.isPlaying) particles.Play(true);
+            }
+        }
+
+        private static void GetVisibleHeightRange(out float waterHeight, out float highestBuilding)
+        {
+            waterHeight = 0f;
+            bool foundWater = false;
+            float highest = float.NegativeInfinity;
+
+            foreach (Transform candidate in FindObjectsByType<Transform>(FindObjectsInactive.Include,
+                         FindObjectsSortMode.None))
+            {
+                if (!foundWater && candidate.name == "Water"
+                    && candidate.TryGetComponent<Renderer>(out var waterRenderer))
+                {
+                    waterHeight = waterRenderer.bounds.center.y;
+                    foundWater = true;
+                }
+
+                if (candidate.name != "Aldeias") continue;
+                foreach (Renderer building in candidate.GetComponentsInChildren<Renderer>(true))
+                    if (building is not ParticleSystemRenderer)
+                        highest = Mathf.Max(highest, building.bounds.max.y);
+            }
+
+            if (!foundWater)
+            {
+                BoatController3D boat = FindFirstObjectByType<BoatController3D>();
+                if (boat != null) waterHeight = boat.transform.position.y;
+            }
+            highestBuilding = float.IsNegativeInfinity(highest) ? waterHeight + 10f : highest;
+            highestBuilding = Mathf.Max(waterHeight + .5f, highestBuilding);
         }
     }
 }

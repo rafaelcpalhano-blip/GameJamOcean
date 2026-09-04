@@ -169,6 +169,8 @@ namespace GameJamOcean.Boat
         private void FixedUpdate()
         {
             if (GameJamOcean.UI.GameMenus.BlocksGameplay || boatRigidbody.isKinematic) return;
+            // Steering owns yaw; collision torque must not keep turning the hull.
+            boatRigidbody.angularVelocity = Vector3.zero;
             float deltaTime = Time.fixedDeltaTime;
             Vector3 forward = boatRigidbody.rotation
                 * Quaternion.Euler(0f, -modelForwardOffset, 0f) * Vector3.forward;
@@ -328,7 +330,8 @@ namespace GameJamOcean.Boat
             boatRigidbody.collisionDetectionMode = CollisionDetectionMode.Continuous;
             boatRigidbody.constraints = RigidbodyConstraints.FreezePositionY
                 | RigidbodyConstraints.FreezeRotationX
-                | RigidbodyConstraints.FreezeRotationZ;
+                | RigidbodyConstraints.FreezeRotationZ
+                | RigidbodyConstraints.FreezeRotationY;
         }
 
         private void OnValidate()

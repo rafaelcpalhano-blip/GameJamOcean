@@ -47,6 +47,12 @@ namespace GameJamOcean.Boat
 
             clock.nextAllowedDamageTime = Time.time + damageCooldown;
             boatHealth.TakeDamage(percentageOfMaximumHealth ? boatHealth.MaximumHealth * damage / 100f : damage, gameObject);
+            Vector3 push = boat.transform.position - transform.position;
+            push.y = 0f;
+            if (push.sqrMagnitude < .001f) push = -boat.NavigationForward;
+            push.Normalize();
+            FindFirstObjectByType<GameJamOcean.CameraSystem.CameraFollow3D>()?.PlayCollisionImpact(push);
+            boat.GetComponent<BoatWaterMotion3D>()?.PlayCollisionImpact(push);
         }
 
         private void OnValidate()

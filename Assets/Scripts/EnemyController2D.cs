@@ -88,11 +88,35 @@ namespace GameJamOcean.Enemies
         private int deathStateHash;
         private int currentStateHash;
         private bool deathAnimationPlaying;
+        private enum SpeciesProfile { Standard, AguaViva, PeixeEspada, Polvo, SereiaMaga, SereiaGuerreira }
+        private SpeciesProfile speciesProfile;
+        private bool warriorCharging;
+        private float warriorSpecialUntil, warriorNextCharge;
+        private int warriorOrbitSide = 1;
+        [Header("Species Special Movement")]
+        [SerializeField, Range(0f, 1f)] private float jellyfishDodgeChance = .65f;
+        [SerializeField, Min(.05f)] private float jellyfishDodgeDuration = .32f;
+        [SerializeField, Min(1f)] private float jellyfishDodgeSpeedMultiplier = 2.3f;
+        [SerializeField, Min(.1f)] private float octopusDashCooldown = 2.4f;
+        [SerializeField, Min(.05f)] private float octopusDashDuration = .65f;
+        [SerializeField, Min(1f)] private float octopusDashSpeedMultiplier = 2.25f;
+        private float jellyfishDodgeUntil;
+        private Vector2 jellyfishDodgeDirection;
+        private float octopusDashUntil, octopusNextDash;
+        private int octopusOrbitSide = 1;
+        [SerializeField, Min(.1f)] private float octopusLungeIntervalMin = 1.8f;
+        [SerializeField, Min(.1f)] private float octopusLungeIntervalMax = 3.4f;
+        [SerializeField, Min(.05f)] private float octopusLungeDuration = .42f;
+        [SerializeField, Min(1f)] private float octopusLungeSpeedMultiplier = 2.6f;
+        private float octopusLungeUntil, octopusNextLunge;
 
         private void Awake()
         {
             enemyRigidbody = GetComponent<Rigidbody2D>();
             enemyHealth = GetComponent<Health>();
+            speciesProfile = DetectSpecies(name);
+            if (speciesProfile == SpeciesProfile.PeixeEspada) movementSpeed *= 1.35f;
+            if (speciesProfile == SpeciesProfile.Polvo) movementSpeed *= 1.22f;
             movementBounds = FindFirstObjectByType<GameJamOcean.World.MovementBounds2D>();
 
             if (animator == null)
@@ -114,6 +138,11 @@ namespace GameJamOcean.Enemies
             if (!ActiveEnemies.Contains(this)) ActiveEnemies.Add(this);
             weavePhase = UnityEngine.Random.Range(0f, Mathf.PI * 2f);
             weaveFrequency = UnityEngine.Random.Range(.65f, 1.35f);
+            octopusOrbitSide = UnityEngine.Random.value < .5f ? -1 : 1;
+            octopusNextDash = Time.time + UnityEngine.Random.Range(.4f, 1.4f);
+            octopusNextLunge = Time.time + UnityEngine.Random.Range(octopusLungeIntervalMin, octopusLungeIntervalMax);
+            if (speciesProfile == SpeciesProfile.AguaViva)
+                HarpoonLauncher2D.HarpoonFired += HandleHarpoonFired;
             enemyHealth.Damaged += HandleDamaged;
             enemyHealth.Died += HandleDeath;
         }
@@ -127,6 +156,8 @@ namespace GameJamOcean.Enemies
         private void OnDisable()
         {
             ActiveEnemies.Remove(this);
+            if (speciesProfile == SpeciesProfile.AguaViva)
+                HarpoonLauncher2D.HarpoonFired -= HandleHarpoonFired;
             enemyHealth.Damaged -= HandleDamaged;
             enemyHealth.Died -= HandleDeath;
         }
@@ -166,21 +197,44 @@ namespace GameJamOcean.Enemies
                 if (other == this || other == null || other.enemyHealth.IsDead) continue;
                 Vector2 away = enemyRigidbody.position - other.enemyRigidbody.position;
                 float gap = away.magnitude;
-                if (gap >= separationRadius) continue;
+                bool fellowOctopus = speciesProfile == SpeciesProfile.Polvo
+                    && other.speciesProfile == SpeciesProfile.Polvo;
+                float desiredGap = fellowOctopus ? separationRadius * 1.85f : separationRadius;
+                if (gap >= desiredGap) continue;
                 if (gap < .001f)
                 {
                     // Stable opposite directions also separate perfectly overlapping spawns.
                     away = GetInstanceID() < other.GetInstanceID() ? Vector2.left : Vector2.right;
                 }
-                separation += away.normalized * (1f - gap / separationRadius);
+                separation += away.normalized * (1f - gap / desiredGap)
+                    * (fellowOctopus ? 2.2f : 1f);
             }
-            separation = Vector2.ClampMagnitude(separation, 1f) * separationStrength;
+            float separationMultiplier = speciesProfile == SpeciesProfile.Polvo ? 1.8f : 1f;
+            separation = Vector2.ClampMagnitude(separation, 1f) * separationStrength * separationMultiplier;
             float weave = Mathf.Sin(Time.time * weaveFrequency + weavePhase)
                 + .3f * Mathf.Sin(Time.time * weaveFrequency * 1.73f + weavePhase);
             float approach = Mathf.Clamp01((distance - attackRange) / 2f);
-            Vector2 sideways = new Vector2(-direction.y, direction.x) * (weave * weaveStrength * approach);
+            float speciesWeave = speciesProfile == SpeciesProfile.Polvo ? .65f : 1f;
+            Vector2 tangent = new Vector2(-direction.y, direction.x);
+            Vector2 sideways = tangent * (weave * weaveStrength * approach * speciesWeave);
             Vector2 pursuit = distance > Mathf.Max(stoppingDistance, attackRange) ? direction : Vector2.zero;
-            Vector2 desired = Vector2.ClampMagnitude(pursuit + sideways + separation, 1f) * movementSpeed;
+            float speedMultiplier = 1f;
+            if (speciesProfile == SpeciesProfile.Polvo)
+                ApplyOctopusMovement(distance, direction, tangent, ref pursuit, ref sideways, ref speedMultiplier);
+
+            Vector2 special = Vector2.zero;
+            if (speciesProfile == SpeciesProfile.AguaViva && Time.time < jellyfishDodgeUntil)
+            {
+                pursuit = Vector2.zero;
+                sideways = Vector2.zero;
+                special = jellyfishDodgeDirection;
+                speedMultiplier = jellyfishDodgeSpeedMultiplier;
+            }
+            if (speciesProfile == SpeciesProfile.SereiaGuerreira)
+                ApplyWarriorMovement(distance, direction, tangent, ref pursuit, ref sideways, ref speedMultiplier);
+
+            Vector2 desired = Vector2.ClampMagnitude(pursuit + sideways + separation + special, 1f)
+                * movementSpeed * speedMultiplier;
             Vector2 velocity = Vector2.Lerp(enemyRigidbody.linearVelocity, desired,
                 1f - Mathf.Exp(-steeringSharpness * Time.fixedDeltaTime));
             if (movementBounds != null)
@@ -208,14 +262,15 @@ namespace GameJamOcean.Enemies
             if (attackType == EnemyAttackType.Projectile)
             {
                 Vector2 direction = ((Vector2)target.position - enemyRigidbody.position).normalized;
-                StartCoroutine(LaunchProjectileAfterDelay(direction));
+                int shots = speciesProfile == SpeciesProfile.SereiaMaga && UnityEngine.Random.value < .5f ? 2 : 1;
+                StartCoroutine(LaunchProjectileAfterDelay(direction, shots));
                 return;
             }
 
             targetHealth.TakeDamage(attackDamage, gameObject);
         }
 
-        private IEnumerator LaunchProjectileAfterDelay(Vector2 direction)
+        private IEnumerator LaunchProjectileAfterDelay(Vector2 direction, int shots)
         {
             if (projectileReleaseDelay > 0f)
             {
@@ -227,14 +282,106 @@ namespace GameJamOcean.Enemies
                 yield break;
             }
 
-            Vector2 origin = projectileSpawnPoint != null
-                ? projectileSpawnPoint.position
-                : transform.position;
-            EnemyProjectile2D projectile = Instantiate(
-                projectilePrefab,
-                origin,
-                Quaternion.identity);
-            projectile.Launch(direction, targetHealth, gameObject, attackDamage);
+            for (int shot = 0; shot < shots; shot++)
+            {
+                if (enemyHealth.IsDead || targetHealth == null || targetHealth.IsDead) yield break;
+                Vector2 origin = projectileSpawnPoint != null ? projectileSpawnPoint.position : transform.position;
+                direction = ((Vector2)target.position - origin).normalized;
+                EnemyProjectile2D projectile = Instantiate(projectilePrefab, origin, Quaternion.identity);
+                projectile.Launch(direction, targetHealth, gameObject, attackDamage);
+                if (shot + 1 < shots) yield return new WaitForSeconds(.18f);
+            }
+        }
+
+        private void HandleHarpoonFired(Vector2 origin, Vector2 direction)
+        {
+            if (enemyHealth == null || enemyHealth.IsDead || UnityEngine.Random.value > jellyfishDodgeChance) return;
+            Vector2 incoming = enemyRigidbody.position - origin;
+            float distance = incoming.magnitude;
+            if (distance <= .01f || distance > 6f
+                || Vector2.Dot(direction.normalized, incoming / distance) < .72f) return;
+            Vector2 perpendicular = new(-direction.y, direction.x);
+            // The side is intentionally unpredictable, so not every successful reaction is perfect.
+            jellyfishDodgeDirection = perpendicular * (UnityEngine.Random.value < .5f ? -1f : 1f);
+            jellyfishDodgeUntil = Time.time + jellyfishDodgeDuration;
+        }
+
+        private void ApplyOctopusMovement(float distance, Vector2 direction, Vector2 tangent,
+            ref Vector2 pursuit, ref Vector2 sideways, ref float speedMultiplier)
+        {
+            if (Time.time >= octopusNextLunge && distance <= 4.5f)
+            {
+                octopusLungeUntil = Time.time + octopusLungeDuration;
+                octopusNextLunge = octopusLungeUntil
+                    + UnityEngine.Random.Range(octopusLungeIntervalMin, octopusLungeIntervalMax);
+                PlayActionAnimation(attackStateHash, Mathf.Max(attackAnimationDuration, octopusLungeDuration));
+            }
+            if (Time.time >= octopusLungeUntil && Time.time >= octopusNextDash && distance <= 4.5f)
+            {
+                octopusDashUntil = Time.time + octopusDashDuration;
+                octopusNextDash = octopusDashUntil + octopusDashCooldown;
+                octopusOrbitSide *= -1;
+            }
+
+            sideways = Vector2.zero;
+            if (Time.time < octopusLungeUntil)
+            {
+                // Random lunges interrupt the orbit briefly; normal melee contact applies the damage.
+                pursuit = direction;
+                speedMultiplier = octopusLungeSpeedMultiplier;
+            }
+            else if (Time.time < octopusDashUntil)
+            {
+                // A fast curved pass takes the octopus across the diver instead of piling up in front.
+                pursuit = tangent * octopusOrbitSide + direction * .22f;
+                speedMultiplier = octopusDashSpeedMultiplier;
+            }
+            else if (distance <= 4.5f)
+            {
+                pursuit = tangent * octopusOrbitSide + direction * (distance > 2.4f ? .3f : -.18f);
+                speedMultiplier = 1.15f;
+            }
+        }
+
+        private void ApplyWarriorMovement(float distance, Vector2 direction, Vector2 tangent,
+            ref Vector2 pursuit, ref Vector2 sideways, ref float speedMultiplier)
+        {
+            if (warriorCharging && Time.time >= warriorSpecialUntil)
+            {
+                warriorCharging = false;
+                warriorSpecialUntil = Time.time + 1.15f;
+                warriorNextCharge = warriorSpecialUntil + .15f;
+                warriorOrbitSide *= -1;
+            }
+            if (!warriorCharging && Time.time >= warriorSpecialUntil
+                && Time.time >= warriorNextCharge && distance <= 4.5f)
+            {
+                warriorCharging = true;
+                warriorSpecialUntil = Time.time + .65f;
+            }
+
+            sideways = Vector2.zero;
+            if (warriorCharging)
+            {
+                pursuit = direction;
+                speedMultiplier = 2f;
+            }
+            else if (Time.time < warriorSpecialUntil)
+            {
+                pursuit = direction * -.25f + tangent * warriorOrbitSide;
+                speedMultiplier = 1.65f;
+            }
+        }
+
+        private static SpeciesProfile DetectSpecies(string objectName)
+        {
+            string normalized = objectName.ToLowerInvariant().Replace(" ", "").Replace("(clone)", "");
+            if (normalized.Contains("aguaviva")) return SpeciesProfile.AguaViva;
+            if (normalized.Contains("peixeespada")) return SpeciesProfile.PeixeEspada;
+            if (normalized.Contains("polvo")) return SpeciesProfile.Polvo;
+            if (normalized.Contains("sereiamaga")) return SpeciesProfile.SereiaMaga;
+            if (normalized.Contains("sereiaguerreira")) return SpeciesProfile.SereiaGuerreira;
+            return SpeciesProfile.Standard;
         }
 
         private void UpdateMovementAnimation()

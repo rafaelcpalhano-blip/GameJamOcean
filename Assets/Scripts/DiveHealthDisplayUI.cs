@@ -19,6 +19,7 @@ namespace GameJamOcean.UI
         [SerializeField] private int displayedCurrentHealth;
 
         private readonly List<Image> masks = new();
+        public Sprite MaskSprite => maskTemplate != null ? maskTemplate.sprite : null;
 
         private void Awake()
         {

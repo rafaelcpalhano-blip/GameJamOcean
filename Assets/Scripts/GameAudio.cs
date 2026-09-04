@@ -75,6 +75,15 @@ namespace GameJamOcean.Audio
             if (settings != null && settings.harpoonShot != null)
                 effects.PlayOneShot(settings.harpoonShot, 0.15f);
         }
+        private void Update()
+        {
+            // Web browsers may initially suspend audio until the first user gesture.
+            if (AudioListener.pause || ambience.clip == null || ambience.isPlaying) return;
+            var mouse = UnityEngine.InputSystem.Mouse.current;
+            var keyboard = UnityEngine.InputSystem.Keyboard.current;
+            if ((mouse != null && mouse.leftButton.wasPressedThisFrame)
+                || (keyboard != null && keyboard.anyKey.wasPressedThisFrame)) ambience.Play();
+        }
         private void OnDestroy() { if (Instance == this) Instance = null; }
         // Route future obstacle/dive effects through this source to respect the effects slider.
         public void PlayEffect(AudioClip clip) { if (clip != null) effects.PlayOneShot(clip); }

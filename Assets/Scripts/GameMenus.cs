@@ -89,6 +89,8 @@ namespace GameJamOcean.UI
             if (scene.name != Ocean && scene.name != "DiveScene") return;
             gameAudio.SetScene(scene.name);
             if (scene.name == Ocean) GameJamOcean.World.OceanRockSetup.Configure(scene);
+            if (scene.name == Ocean) GameJamOcean.World.SharkFinPatrol3D.ConfigureScene(scene);
+            if (scene.name == Ocean) GameJamOcean.World.WindVfxEnhancer3D.ConfigureScene(scene);
             loading = false;
             bool showMain = scene.name == Ocean && (firstScene || requestMain);
             firstScene = false;

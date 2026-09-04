@@ -74,7 +74,7 @@ namespace GameJamOcean.Boat
         private void Start()
         {
             ApplyPurchasedUpgrades();
-            health.Restore();
+            if (!OceanReturnState3D.TryRestoreHealth(health)) health.Restore();
         }
 
         private void ApplyPurchasedUpgrades()

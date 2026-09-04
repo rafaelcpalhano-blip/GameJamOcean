@@ -1,4 +1,5 @@
 using UnityEngine;
+using GameJamOcean.Combat;
 
 namespace GameJamOcean.Boat
 {
@@ -7,6 +8,8 @@ namespace GameJamOcean.Boat
         private static bool hasPendingReturn;
         private static Vector3 returnPosition;
         private static Quaternion returnRotation;
+        private static float returnHealth;
+        private static bool hasReturnHealth;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         public static void ResetRuntimeState()
@@ -14,6 +17,8 @@ namespace GameJamOcean.Boat
             hasPendingReturn = false;
             returnPosition = default;
             returnRotation = Quaternion.identity;
+            returnHealth = 0f;
+            hasReturnHealth = false;
         }
 
         public static void Save(Transform boat)
@@ -25,6 +30,9 @@ namespace GameJamOcean.Boat
 
             returnPosition = boat.position;
             returnRotation = boat.rotation;
+            Health health = boat.GetComponent<Health>();
+            hasReturnHealth = health != null && !health.IsDead;
+            if (hasReturnHealth) returnHealth = health.CurrentHealth;
             hasPendingReturn = true;
         }
 
@@ -35,7 +43,6 @@ namespace GameJamOcean.Boat
                 return false;
             }
 
-            hasPendingReturn = false;
             boat.SetPositionAndRotation(returnPosition, returnRotation);
 
             if (boatRigidbody != null)
@@ -49,6 +56,15 @@ namespace GameJamOcean.Boat
                 }
             }
 
+            return true;
+        }
+
+        public static bool TryRestoreHealth(Health health)
+        {
+            if (!hasPendingReturn || !hasReturnHealth || health == null) return false;
+            health.SetCurrentHealth(returnHealth);
+            hasPendingReturn = false;
+            hasReturnHealth = false;
             return true;
         }
     }

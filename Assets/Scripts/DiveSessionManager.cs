@@ -6,6 +6,8 @@ using GameJamOcean.Player;
 using GameJamOcean.Progression;
 using UnityEngine;
 using UnityEngine.Events;
+using GameJamOcean.UI;
+using GameJamOcean.World;
 
 namespace GameJamOcean.Diving
 {
@@ -118,6 +120,7 @@ namespace GameJamOcean.Diving
 
         private readonly HashSet<EnemyController2D> registeredEnemies = new();
         private bool[] releasedMilestones;
+        private DivePowerUpSpawner2D powerUpSpawner;
 
         private void Awake()
         {
@@ -171,6 +174,10 @@ namespace GameJamOcean.Diving
             finalRewardGold = 0;
             releasedMilestones = new bool[chestMilestones.Count];
             sessionState = DiveSessionState.Running;
+
+            if (!TryGetComponent(out powerUpSpawner))
+                powerUpSpawner = gameObject.AddComponent<DivePowerUpSpawner2D>();
+            powerUpSpawner.Configure(this);
 
             FindPlayerHealthIfNeeded();
             SubscribeToPlayer();
@@ -381,6 +388,138 @@ namespace GameJamOcean.Diving
             }
 
             chestMilestones.Sort();
+        }
+    }
+
+    /// <summary>Reusable phase power-up scheduler. New power-up types can be added to its selection later.</summary>
+    [DisallowMultipleComponent]
+    public sealed class DivePowerUpSpawner2D : MonoBehaviour
+    {
+        [Header("Random Spawn Area")]
+        [SerializeField, Min(20)] private int candidatePointCount = 20;
+        [SerializeField, Min(.1f)] private float boundaryMargin = .75f;
+        [SerializeField, Min(.1f)] private float minimumPlayerDistance = 2.5f;
+        [Header("Health Power Up")]
+        [SerializeField, Min(.1f)] private float healthRestored = 1f;
+        [SerializeField, Range(.1f, 1f)] private float spriteScale = .65f;
+        [SerializeField, Range(1f, 99f)] private float secondSpawnPercentage = 20f;
+
+        private readonly List<Vector2> candidatePoints = new();
+        private DiveSessionManager session;
+        private MovementBounds2D movementBounds;
+        private Health playerHealth;
+        private Sprite maskSprite;
+        private bool initialSpawned, milestoneSpawned;
+        private int previousPoint = -1;
+
+        public void Configure(DiveSessionManager owner)
+        {
+            if (session != null) session.CompletionPercentageChanged -= HandleProgress;
+            session = owner;
+            movementBounds = FindFirstObjectByType<MovementBounds2D>();
+            var diver = FindFirstObjectByType<DiverController>();
+            playerHealth = diver != null ? diver.GetComponent<Health>() : null;
+            maskSprite = FindFirstObjectByType<DiveHealthDisplayUI>()?.MaskSprite;
+            initialSpawned = milestoneSpawned = false;
+            previousPoint = -1;
+            GenerateCandidatePoints();
+            if (session != null) session.CompletionPercentageChanged += HandleProgress;
+            SpawnHealthPowerUp();
+            initialSpawned = true;
+        }
+
+        private void OnDisable()
+        {
+            if (session != null) session.CompletionPercentageChanged -= HandleProgress;
+        }
+
+        private void HandleProgress(float percentage)
+        {
+            if (!initialSpawned || milestoneSpawned || percentage + Mathf.Epsilon < secondSpawnPercentage) return;
+            milestoneSpawned = true;
+            SpawnHealthPowerUp();
+        }
+
+        private void GenerateCandidatePoints()
+        {
+            candidatePoints.Clear();
+            Bounds bounds = movementBounds != null
+                ? movementBounds.Bounds : new Bounds(Vector3.zero, new Vector3(18f, 10f, 0f));
+            float minX = bounds.min.x + boundaryMargin;
+            float maxX = bounds.max.x - boundaryMargin;
+            float minY = bounds.min.y + boundaryMargin;
+            float maxY = bounds.max.y - boundaryMargin;
+            for (int i = 0; i < Mathf.Max(20, candidatePointCount); i++)
+                candidatePoints.Add(new Vector2(UnityEngine.Random.Range(minX, maxX),
+                    UnityEngine.Random.Range(minY, maxY)));
+        }
+
+        private void SpawnHealthPowerUp()
+        {
+            if (candidatePoints.Count == 0 || playerHealth == null || maskSprite == null) return;
+            int selected = SelectPoint();
+            previousPoint = selected;
+            var pickup = new GameObject("PowerUp_Vida");
+            pickup.transform.position = candidatePoints[selected];
+            pickup.transform.localScale = Vector3.one * spriteScale;
+            var renderer = pickup.AddComponent<SpriteRenderer>();
+            renderer.sprite = maskSprite;
+            renderer.color = new Color(1f, .72f, .72f, 1f);
+            var playerRenderer = playerHealth.GetComponentInChildren<SpriteRenderer>();
+            if (playerRenderer != null)
+            {
+                renderer.sortingLayerID = playerRenderer.sortingLayerID;
+                renderer.sortingOrder = playerRenderer.sortingOrder + 3;
+            }
+            var body = pickup.AddComponent<Rigidbody2D>();
+            body.bodyType = RigidbodyType2D.Kinematic;
+            body.gravityScale = 0f;
+            var collider = pickup.AddComponent<CircleCollider2D>();
+            collider.isTrigger = true;
+            collider.radius = .45f;
+            pickup.AddComponent<DiveHealthPowerUp2D>().Configure(healthRestored);
+        }
+
+        private int SelectPoint()
+        {
+            int best = 0;
+            float bestDistance = -1f;
+            for (int attempt = 0; attempt < candidatePoints.Count; attempt++)
+            {
+                int index = UnityEngine.Random.Range(0, candidatePoints.Count);
+                if (index == previousPoint) continue;
+                float distance = Vector2.Distance(candidatePoints[index], playerHealth.transform.position);
+                if (distance >= minimumPlayerDistance) return index;
+                if (distance > bestDistance) { bestDistance = distance; best = index; }
+            }
+            return best;
+        }
+    }
+
+    public sealed class DiveHealthPowerUp2D : MonoBehaviour
+    {
+        private float healthRestored = 1f;
+        private Vector3 origin;
+
+        public void Configure(float amount)
+        {
+            healthRestored = Mathf.Max(.1f, amount);
+            origin = transform.position;
+        }
+
+        private void Update()
+        {
+            transform.position = origin + Vector3.up * (Mathf.Sin(Time.time * 3f) * .08f);
+            transform.Rotate(0f, 0f, 35f * Time.deltaTime);
+        }
+
+        private void OnTriggerEnter2D(Collider2D other)
+        {
+            DiverController diver = other.GetComponentInParent<DiverController>();
+            if (diver == null || !diver.TryGetComponent(out Health health)
+                || health.IsDead || health.CurrentHealth >= health.MaximumHealth) return;
+            health.Heal(Mathf.Min(healthRestored, health.MaximumHealth - health.CurrentHealth));
+            Destroy(gameObject);
         }
     }
 }
