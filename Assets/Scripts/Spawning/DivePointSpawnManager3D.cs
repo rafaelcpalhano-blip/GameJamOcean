@@ -32,7 +32,7 @@ namespace GameJamOcean.Spawning
         private readonly Dictionary<int, GameObject> instancesByPoint = new();
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetRuntimeState()
+        public static void ResetRuntimeState()
         {
             PersistentActiveIndices.Clear();
             persistentPointCount = -1;

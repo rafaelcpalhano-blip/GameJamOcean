@@ -35,6 +35,17 @@ namespace GameJamOcean.Flow
 
         public bool CompletedSuccessfully => completedSuccessfully;
         public int CommittedGold => committedGold;
+        public bool IsTransitioning => transitioning;
+
+        public void CommitAbandonedSession()
+        {
+            if (transitioning || sessionManager == null) return;
+            transitioning = true;
+            completedSuccessfully = false;
+            committedGold = sessionManager.SecuredGold + sessionManager.CollectedCoinGold;
+            DisablePlayerControl();
+            GameProgress.Instance.AddGold(committedGold);
+        }
 
         private void Awake()
         {

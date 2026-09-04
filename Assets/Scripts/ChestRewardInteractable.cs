@@ -154,6 +154,7 @@ namespace GameJamOcean.Rewards
 
         public void Interact(GameObject interactor)
         {
+            if (GameJamOcean.UI.GameMenus.BlocksGameplay) return;
             if (!CanInteract(interactor))
             {
                 return;

@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using GameJamOcean.Combat;
 using GameJamOcean.Player;
 using GameJamOcean.Weapons;
@@ -25,6 +26,17 @@ namespace GameJamOcean.Enemies
         [Header("Movement")]
         [SerializeField, Min(0f)] private float movementSpeed = 2f;
         [SerializeField, Min(0f)] private float stoppingDistance = 0.65f;
+        [Header("Varied Pursuit and Spacing")]
+        [SerializeField, Min(.1f)] private float separationRadius = 1.5f;
+        [SerializeField, Range(0f, 3f)] private float separationStrength = 1.3f;
+        [SerializeField, Range(0f, 1f)] private float weaveStrength = .55f;
+        [SerializeField, Min(.1f)] private float steeringSharpness = 3f;
+        private static readonly List<EnemyController2D> ActiveEnemies = new();
+        private float weavePhase, weaveFrequency;
+        private GameJamOcean.World.MovementBounds2D movementBounds;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetActiveEnemies() => ActiveEnemies.Clear();
 
         [Header("Attack")]
         [SerializeField] private EnemyAttackType attackType = EnemyAttackType.Melee;
@@ -32,6 +44,7 @@ namespace GameJamOcean.Enemies
         [SerializeField, Min(0f)] private float attackDamage = 1f;
         [SerializeField, Min(0.01f)] private float attackCooldown = 1.25f;
         [SerializeField] private UnityEvent onAttack;
+        [SerializeField] private AudioClip attackSound;
         [SerializeField] private UnityEvent onEnemyDied;
 
         [Header("Projectile Attack")]
@@ -80,6 +93,7 @@ namespace GameJamOcean.Enemies
         {
             enemyRigidbody = GetComponent<Rigidbody2D>();
             enemyHealth = GetComponent<Health>();
+            movementBounds = FindFirstObjectByType<GameJamOcean.World.MovementBounds2D>();
 
             if (animator == null)
             {
@@ -97,6 +111,9 @@ namespace GameJamOcean.Enemies
 
         private void OnEnable()
         {
+            if (!ActiveEnemies.Contains(this)) ActiveEnemies.Add(this);
+            weavePhase = UnityEngine.Random.Range(0f, Mathf.PI * 2f);
+            weaveFrequency = UnityEngine.Random.Range(.65f, 1.35f);
             enemyHealth.Damaged += HandleDamaged;
             enemyHealth.Died += HandleDeath;
         }
@@ -109,6 +126,7 @@ namespace GameJamOcean.Enemies
 
         private void OnDisable()
         {
+            ActiveEnemies.Remove(this);
             enemyHealth.Damaged -= HandleDamaged;
             enemyHealth.Died -= HandleDeath;
         }
@@ -139,15 +157,39 @@ namespace GameJamOcean.Enemies
 
             if (distance <= attackRange)
             {
-                enemyRigidbody.linearVelocity = Vector2.zero;
                 TryAttack();
-                UpdateMovementAnimation();
-                return;
             }
 
-            enemyRigidbody.linearVelocity = distance > stoppingDistance
-                ? direction * movementSpeed
-                : Vector2.zero;
+            Vector2 separation = Vector2.zero;
+            foreach (var other in ActiveEnemies)
+            {
+                if (other == this || other == null || other.enemyHealth.IsDead) continue;
+                Vector2 away = enemyRigidbody.position - other.enemyRigidbody.position;
+                float gap = away.magnitude;
+                if (gap >= separationRadius) continue;
+                if (gap < .001f)
+                {
+                    // Stable opposite directions also separate perfectly overlapping spawns.
+                    away = GetInstanceID() < other.GetInstanceID() ? Vector2.left : Vector2.right;
+                }
+                separation += away.normalized * (1f - gap / separationRadius);
+            }
+            separation = Vector2.ClampMagnitude(separation, 1f) * separationStrength;
+            float weave = Mathf.Sin(Time.time * weaveFrequency + weavePhase)
+                + .3f * Mathf.Sin(Time.time * weaveFrequency * 1.73f + weavePhase);
+            float approach = Mathf.Clamp01((distance - attackRange) / 2f);
+            Vector2 sideways = new Vector2(-direction.y, direction.x) * (weave * weaveStrength * approach);
+            Vector2 pursuit = distance > Mathf.Max(stoppingDistance, attackRange) ? direction : Vector2.zero;
+            Vector2 desired = Vector2.ClampMagnitude(pursuit + sideways + separation, 1f) * movementSpeed;
+            Vector2 velocity = Vector2.Lerp(enemyRigidbody.linearVelocity, desired,
+                1f - Mathf.Exp(-steeringSharpness * Time.fixedDeltaTime));
+            if (movementBounds != null)
+            {
+                Vector2 next = enemyRigidbody.position + velocity * Time.fixedDeltaTime;
+                next = movementBounds.ClampPoint(next, Vector2.one * .2f);
+                velocity = Vector2.ClampMagnitude((next - enemyRigidbody.position) / Time.fixedDeltaTime, movementSpeed);
+            }
+            enemyRigidbody.linearVelocity = velocity;
             UpdateMovementAnimation();
         }
 
@@ -161,6 +203,7 @@ namespace GameJamOcean.Enemies
             nextAttackTime = Time.time + attackCooldown;
             PlayActionAnimation(attackStateHash, attackAnimationDuration);
             onAttack?.Invoke();
+            GameJamOcean.Audio.GameAudio.Instance?.PlayEffect(attackSound);
 
             if (attackType == EnemyAttackType.Projectile)
             {

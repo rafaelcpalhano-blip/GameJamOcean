@@ -180,6 +180,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameJamOcean.Weapons.HarpoonProjectile2D
   speed: 12
+  flightSpeedMultiplier: 0.9
   damage: 1
   lifetime: 3
   hittableLayers:

@@ -35,7 +35,8 @@ namespace GameJamOcean.Boat
 
         private void FixedUpdate()
         {
-            if (waterRenderer == null)
+            if (waterRenderer == null || boatRigidbody == null || boatRigidbody.isKinematic
+                || GameJamOcean.UI.GameMenus.BlocksGameplay)
             {
                 return;
             }

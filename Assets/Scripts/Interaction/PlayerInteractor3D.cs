@@ -69,6 +69,7 @@ namespace GameJamOcean.Interaction
 
         private void Update()
         {
+            if (GameJamOcean.UI.GameMenus.BlocksGameplay) return;
             FindClosestInteractable();
             HandleLeftClick();
         }
@@ -188,6 +189,7 @@ namespace GameJamOcean.Interaction
 
         private void OnInteractPerformed(InputAction.CallbackContext context)
         {
+            if (GameJamOcean.UI.GameMenus.BlocksGameplay) return;
             FindClosestInteractable();
             if (currentInteractable != null && currentInteractable.CanInteract(gameObject))
             {

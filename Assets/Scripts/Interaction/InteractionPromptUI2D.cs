@@ -33,6 +33,7 @@ namespace GameJamOcean.Interaction
 
         private void Update()
         {
+            if (GameJamOcean.UI.GameMenus.BlocksGameplay) { Hide(); return; }
             FindReferencesIfNeeded();
             if (promptText == null || worldCamera == null)
             {
@@ -42,7 +43,7 @@ namespace GameJamOcean.Interaction
             if (tutorialTarget != null)
             {
                 if (tutorialTarget.IsAvailable
-                    && Time.unscaledTime < tutorialEndTime
+                    && Time.time < tutorialEndTime
                     && IsOnScreen(tutorialTarget.PromptWorldPosition))
                 {
                     Show(tutorialTarget, firstTimeMessage);
@@ -56,7 +57,7 @@ namespace GameJamOcean.Interaction
             if (newTutorial != null)
             {
                 tutorialTarget = newTutorial;
-                tutorialEndTime = Time.unscaledTime + firstTimeDuration;
+                tutorialEndTime = Time.time + firstTimeDuration;
                 InteractionDiscoveryStore.MarkSeen(newTutorial.DiscoveryKey);
                 Show(newTutorial, firstTimeMessage);
                 return;

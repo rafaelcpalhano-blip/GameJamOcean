@@ -18,6 +18,35 @@ namespace GameJamOcean.Progression
         [Header("Boat")]
         [SerializeField] private BoatController3D boat;
         [SerializeField] private PlayerInteractor3D interactor;
+        [Header("Boat Repair")]
+        [Tooltip("Price for repairing a completely damaged hull. Partial damage is charged proportionally.")]
+        [SerializeField, Min(0)] private int fullRepairCost = 150;
+        private Button repairButton;
+        private TMP_Text repairPrice;
+        private bool repairing;
+
+        private int RepairCost(Health health)
+        {
+            double missing = 1.0 - (double)health.CurrentHealth / health.MaximumHealth;
+            return (int)System.Math.Min(int.MaxValue, System.Math.Max(0,
+                System.Math.Ceiling(System.Math.Max(0, fullRepairCost) * missing - .00001)));
+        }
+
+        private void RepairBoat()
+        {
+            if (!isOpen || repairing || boat == null || !boat.TryGetComponent<Health>(out var health)
+                || health.IsDead || health.CurrentHealth >= health.MaximumHealth) return;
+            int cost = RepairCost(health);
+            repairing = true;
+            try
+            {
+                if (cost > 0 && !progress.TrySpendGold(cost)) { statusLabel.text = "Ouro insuficiente para o conserto."; return; }
+                health.Heal(health.MaximumHealth - health.CurrentHealth);
+                statusLabel.text = $"Barco consertado! Casco 100%. Custo: {cost} ouro.";
+                Refresh();
+            }
+            finally { repairing = false; }
+        }
 
         private GameObject modal;
         private TMP_Text goldLabel;
@@ -60,6 +89,7 @@ namespace GameJamOcean.Progression
 
         public void Open()
         {
+            if (GameJamOcean.UI.GameMenus.BlocksGameplay) return;
             if (isOpen || modal == null || progress == null || Time.timeScale == 0f) return;
             wasMoving = boat != null && boat.enabled;
             wasInteracting = interactor != null && interactor.enabled;
@@ -133,6 +163,14 @@ namespace GameJamOcean.Progression
         {
             if (goldLabel == null || progress == null) return;
             goldLabel.text = $"OURO DISPONÍVEL: {progress.TotalGold}";
+            if (repairButton != null)
+            {
+                var hull = boat != null ? boat.GetComponent<Health>() : null;
+                bool damaged = hull != null && !hull.IsDead && hull.CurrentHealth < hull.MaximumHealth;
+                int cost = damaged ? RepairCost(hull) : 0;
+                repairPrice.text = damaged ? $"CONSERTAR BARCO — {cost} OURO" : "CASCO 100% — SEM REPAROS";
+                repairButton.interactable = damaged && progress.TotalGold >= cost;
+            }
             string error = "Catálogo ausente. Execute Configure Upgrade System.";
             bool valid = progress.Catalog != null && progress.Catalog.Validate(out error);
             for (int i = 0; i < 6; i++)
@@ -181,7 +219,7 @@ namespace GameJamOcean.Progression
             shade.anchorMin = Vector2.zero; shade.anchorMax = Vector2.one;
             shade.offsetMin = shade.offsetMax = Vector2.zero;
             shade.gameObject.AddComponent<Image>().color = new Color(0, 0, 0, 0.65f);
-            RectTransform panel = Rect("Port Upgrades", modal.transform, new Vector2(900, 700), Vector2.zero);
+            RectTransform panel = Rect("Port Upgrades", modal.transform, new Vector2(900, 800), Vector2.zero);
             panel.anchorMin = panel.anchorMax = panel.pivot = new Vector2(0.5f, 0.5f);
             panel.gameObject.AddComponent<Image>().color = new Color(0.025f, 0.10f, 0.14f, 1);
             Label("Title", panel, new Vector2(700, 40), new Vector2(-45, -22), "UPGRADES DO PORTO", 30);
@@ -199,7 +237,9 @@ namespace GameJamOcean.Progression
                 int index = i;
                 buttons[i].onClick.AddListener(() => Buy(index));
             }
-            statusLabel = Label("Status", panel, new Vector2(820, 70), new Vector2(0, -603), "", 21);
+            repairButton = ButtonUI("Repair Boat", panel, new Vector2(650, 55), new Vector2(0, -595), out repairPrice);
+            repairButton.onClick.AddListener(RepairBoat);
+            statusLabel = Label("Status", panel, new Vector2(820, 90), new Vector2(0, -675), "", 21);
             modal.SetActive(false);
         }
 

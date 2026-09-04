@@ -158,6 +158,7 @@ namespace GameJamOcean.Player
 
         private void Update()
         {
+            if (GameJamOcean.UI.GameMenus.BlocksGameplay) return;
             moveInput = Vector2.ClampMagnitude(moveAction.action.ReadValue<Vector2>(), 1f);
             if (Time.timeScale > 0f && (health == null || !health.IsDead))
             {

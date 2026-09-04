@@ -47,6 +47,7 @@ namespace GameJamOcean.CameraSystem
 
         private void LateUpdate()
         {
+            if (GameJamOcean.UI.GameMenus.BlocksGameplay) return;
             if (target == null)
             {
                 return;

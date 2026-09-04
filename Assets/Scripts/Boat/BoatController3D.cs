@@ -22,6 +22,8 @@ namespace GameJamOcean.Boat
         [Header("Water Inertia and Steering")]
         [SerializeField, Min(0f)] private float coastDeceleration = 0.65f;
         [SerializeField, Min(0f)] private float lateralDrag = 1.2f;
+        [Tooltip("Extra lateral grip without changing forward coasting. 1 keeps the original drift.")]
+        [SerializeField, Range(1f, 6f)] private float lateralGripMultiplier = 3f;
         [SerializeField, Range(0.1f, 1f)] private float reverseSpeedRatio = 0.35f;
         [SerializeField, Min(0.01f)] private float steeringSmoothTime = 0.65f;
         [SerializeField, Min(0.1f)] private float fullSteeringSpeed = 1.5f;
@@ -51,6 +53,8 @@ namespace GameJamOcean.Boat
         private float lastTurboUseTime = float.NegativeInfinity;
 
         public float MaximumSpeed => maximumSpeed;
+        public Vector3 DockPosition { get; private set; }
+        public Quaternion DockRotation { get; private set; }
         public Vector3 NavigationForward => transform.rotation
             * Quaternion.Euler(0f, -modelForwardOffset, 0f) * Vector3.forward;
         public float Acceleration => acceleration;
@@ -77,6 +81,8 @@ namespace GameJamOcean.Boat
 
         private void Awake()
         {
+            DockPosition = transform.position;
+            DockRotation = transform.rotation;
             boatRigidbody = GetComponent<Rigidbody>();
             ConfigureRigidbody();
             currentTurboCharge = turboCapacity;
@@ -114,7 +120,7 @@ namespace GameJamOcean.Boat
             smoothedSteering = 0f;
             steeringVelocity = 0f;
             turboActive = false;
-            if (boatRigidbody != null)
+            if (boatRigidbody != null && !boatRigidbody.isKinematic)
             {
                 Vector3 velocity = boatRigidbody.linearVelocity;
                 boatRigidbody.linearVelocity = new Vector3(0f, velocity.y, 0f);
@@ -142,6 +148,7 @@ namespace GameJamOcean.Boat
 
         private void Update()
         {
+            if (GameJamOcean.UI.GameMenus.BlocksGameplay) return;
             moveInput = moveAction.action.ReadValue<Vector2>();
             // Throttle and rudder are independent axes; W+D must not reduce engine power.
             Keyboard keyboard = Keyboard.current;
@@ -161,6 +168,7 @@ namespace GameJamOcean.Boat
 
         private void FixedUpdate()
         {
+            if (GameJamOcean.UI.GameMenus.BlocksGameplay || boatRigidbody.isKinematic) return;
             float deltaTime = Time.fixedDeltaTime;
             Vector3 forward = boatRigidbody.rotation
                 * Quaternion.Euler(0f, -modelForwardOffset, 0f) * Vector3.forward;
@@ -198,7 +206,7 @@ namespace GameJamOcean.Boat
                 forwardSpeed = Mathf.MoveTowards(forwardSpeed, 0f, coastDeceleration * deltaTime);
             }
 
-            sidewaysVelocity *= Mathf.Exp(-lateralDrag * deltaTime);
+            sidewaysVelocity *= Mathf.Exp(-lateralDrag * lateralGripMultiplier * deltaTime);
             horizontalVelocity = forward * forwardSpeed + sidewaysVelocity;
 
             boatRigidbody.linearVelocity = new Vector3(
@@ -210,7 +218,7 @@ namespace GameJamOcean.Boat
                 ref steeringVelocity, steeringSmoothTime, Mathf.Infinity, deltaTime);
             float steeringAuthority = Mathf.Clamp01(Mathf.Abs(forwardSpeed) / fullSteeringSpeed);
             float reverseDirection = forwardSpeed < -0.05f ? -1f : 1f;
-            float yawStep = smoothedSteering * rotationSpeed * steeringAuthority
+            float yawStep = smoothedSteering * rotationSpeed * GameJamOcean.UI.GameMenus.SteeringMultiplier * steeringAuthority
                 * reverseDirection * deltaTime;
             boatRigidbody.MoveRotation(boatRigidbody.rotation * Quaternion.Euler(0f, yawStep, 0f));
         }

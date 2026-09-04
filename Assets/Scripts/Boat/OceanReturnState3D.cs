@@ -9,7 +9,7 @@ namespace GameJamOcean.Boat
         private static Quaternion returnRotation;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetRuntimeState()
+        public static void ResetRuntimeState()
         {
             hasPendingReturn = false;
             returnPosition = default;
@@ -42,8 +42,11 @@ namespace GameJamOcean.Boat
             {
                 boatRigidbody.position = returnPosition;
                 boatRigidbody.rotation = returnRotation;
-                boatRigidbody.linearVelocity = Vector3.zero;
-                boatRigidbody.angularVelocity = Vector3.zero;
+                if (!boatRigidbody.isKinematic)
+                {
+                    boatRigidbody.linearVelocity = Vector3.zero;
+                    boatRigidbody.angularVelocity = Vector3.zero;
+                }
             }
 
             return true;

@@ -16,6 +16,8 @@ namespace GameJamOcean.Weapons
 
         [Header("Firing")]
         [SerializeField, Min(0.01f)] private float fireCooldown = 0.4f;
+        [Tooltip("Additional recovery time after each shot, added to Fire Cooldown.")]
+        [SerializeField, Min(0f)] private float additionalShotDelay = 0.25f;
         [SerializeField, Min(0f)] private float fallbackSpawnDistance = 0.35f;
         [SerializeField] private LayerMask blockedPointerLayers;
 
@@ -73,6 +75,7 @@ namespace GameJamOcean.Weapons
 
         private void TryFire()
         {
+            if (GameJamOcean.UI.GameMenus.BlocksGameplay) return;
             if (Time.time < nextFireTime || harpoonPrefab == null || aimCamera == null || Mouse.current == null)
             {
                 return;
@@ -109,7 +112,8 @@ namespace GameJamOcean.Weapons
                 spawnPosition,
                 Quaternion.identity);
             harpoon.Launch(direction, gameObject);
-            nextFireTime = Time.time + fireCooldown;
+            GameJamOcean.Audio.GameAudio.Instance?.PlayHarpoon();
+            nextFireTime = Time.time + fireCooldown + Mathf.Max(0f, additionalShotDelay);
         }
 
         private void OnValidate()

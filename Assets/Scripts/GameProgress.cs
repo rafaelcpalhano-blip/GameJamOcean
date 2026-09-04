@@ -25,6 +25,7 @@ namespace GameJamOcean.Progression
 
         public static GameProgress Instance { get; private set; }
         public static bool HasInstance => Instance != null;
+        public bool HasSavedGame { get; private set; }
 
         public event Action<int> TotalGoldChanged;
         public event Action UpgradesChanged;
@@ -129,8 +130,9 @@ namespace GameJamOcean.Progression
             return true;
         }
 
-        private void SaveProgress()
+        public void SaveProgress()
         {
+            HasSavedGame = true;
             PlayerPrefs.SetString(SaveKey, JsonUtility.ToJson(new SaveData { gold = totalGold, levels = upgradeLevels }));
             PlayerPrefs.Save();
         }
@@ -143,6 +145,7 @@ namespace GameJamOcean.Progression
             {
                 SaveData saved = JsonUtility.FromJson<SaveData>(PlayerPrefs.GetString(SaveKey));
                 if (saved == null) return;
+                HasSavedGame = true;
                 totalGold = Mathf.Max(0, saved.gold);
                 if (saved.levels != null) for (int i = 0; i < Math.Min(6, saved.levels.Length); i++)
                     upgradeLevels[i] = Mathf.Clamp(saved.levels[i], 1, i == 0 ? 4 : 3);

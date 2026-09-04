@@ -1,3 +1,4 @@
+using System.Collections;
 using GameJamOcean.Combat;
 using GameJamOcean.Progression;
 using UnityEngine;
@@ -40,6 +41,11 @@ namespace GameJamOcean.Boat
 
         private Health health;
         private BoatController3D controller;
+        [Header("Sinking and Rescue")]
+        [SerializeField, Min(.5f)] private float sinkingDuration = 3.5f;
+        [SerializeField, Min(1f)] private float sinkingDepth = 5f;
+        [SerializeField, Range(0f, 40f)] private float sinkingRoll = 22f;
+        private bool sinking;
 
         public Health Health => health;
         public float HealthPercentage => health != null ? health.NormalizedHealth : 0f;
@@ -181,6 +187,59 @@ namespace GameJamOcean.Boat
             {
                 controller.enabled = false;
             }
+            if (!sinking) StartCoroutine(SinkAndRescue());
+        }
+
+        private IEnumerator SinkAndRescue()
+        {
+            sinking = true;
+            GameJamOcean.UI.GameMenus.BoatRecoveryActive = true;
+            var body = GetComponent<Rigidbody>();
+            bool wasKinematic = body.isKinematic;
+            // Do not interpolate from underwater poses across the rescue teleport/pause.
+            var previousInterpolation = body.interpolation;
+            body.interpolation = RigidbodyInterpolation.None;
+            body.isKinematic = true;
+            var colliders = GetComponentsInChildren<Collider>();
+            var enabledColliders = new System.Collections.Generic.List<Collider>();
+            foreach (var c in colliders) if (c.enabled) { enabledColliders.Add(c); c.enabled = false; }
+            var motion = GetComponent<BoatWaterMotion3D>();
+            bool hadMotion = motion != null && motion.enabled;
+            if (hadMotion) motion.enabled = false;
+            Vector3 start = transform.position;
+            Quaternion rotation = transform.rotation;
+            float elapsed = 0;
+            while (elapsed < sinkingDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / sinkingDuration);
+                float strength = Mathf.SmoothStep(0, 1, t);
+                Vector3 sinkPosition = start - Vector3.up * (sinkingDepth * strength);
+                Quaternion sinkRotation = rotation * Quaternion.Euler(strength * 12f, 0,
+                    Mathf.Sin(t * Mathf.PI * 3f) * sinkingRoll * strength);
+                body.position = sinkPosition;
+                body.rotation = sinkRotation;
+                transform.SetPositionAndRotation(sinkPosition, sinkRotation);
+                yield return null;
+            }
+            body.position = controller.DockPosition;
+            body.rotation = controller.DockRotation;
+            transform.SetPositionAndRotation(controller.DockPosition, controller.DockRotation);
+            body.isKinematic = wasKinematic;
+            if (!wasKinematic) { body.linearVelocity = Vector3.zero; body.angularVelocity = Vector3.zero; }
+            foreach (var c in enabledColliders) if (c != null) c.enabled = true;
+            if (hadMotion) motion.enabled = true;
+            Physics.SyncTransforms();
+            RepairToFull();
+            var camera = FindFirstObjectByType<GameJamOcean.CameraSystem.CameraFollow3D>();
+            if (camera != null) camera.ShowRescueView();
+            sinking = false;
+            GameJamOcean.UI.GameMenus.ShowRescueLetter();
+            // The letter and camera transition pause physics. Keep the exact dock pose
+            // visible until simulation has resumed and has fresh interpolation samples.
+            yield return new WaitForFixedUpdate();
+            yield return new WaitForFixedUpdate();
+            if (body != null) body.interpolation = previousInterpolation;
         }
 
         private void RecalculateStats()

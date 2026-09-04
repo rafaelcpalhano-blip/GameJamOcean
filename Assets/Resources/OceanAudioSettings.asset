@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3e100623910245f795fc930050783e54, type: 3}
+  m_Name: OceanAudioSettings
+  m_EditorClassIdentifier: Assembly-CSharp::GameJamOcean.Audio.OceanAudioSettings
+  oceanAmbience: {fileID: 8300000, guid: e3a8d45612da4624cb7f92d756639be1, type: 3}
+  panelOpen: {fileID: 8300000, guid: a04180208ff43074fa72f42f8e61983b, type: 3}
+  writing: {fileID: 8300000, guid: 7bdec05c3629e5b48a26af04aca74b55, type: 3}
+  ambienceGain: 0.65
+  harpoonShot: {fileID: 8300000, guid: 2be5e56fb0c99144484b0d79a21e6d18, type: 3}
+  diveAmbience: {fileID: 8300000, guid: 228851c69bfdfb6479768d9755fff634, type: 3}
+  diveRandomAmbience: {fileID: 8300000, guid: 35a56db5f356630449b845c2085977c6, type: 3}
+  randomMinimumInterval: 2
+  randomMaximumInterval: 5
+  randomAmbienceGain: 0.6

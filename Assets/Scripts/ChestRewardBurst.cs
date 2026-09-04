@@ -42,7 +42,7 @@ namespace GameJamOcean.Rewards
         }
         private void Update()
         {
-            elapsed += Time.unscaledDeltaTime;
+            elapsed += Time.deltaTime;
             if (elapsed >= duration) { Destroy(gameObject); return; }
             float alpha = 1f - Mathf.SmoothStep(0.4f, 1f, elapsed / duration);
             label.transform.localPosition = new Vector3(0, 0.6f + elapsed * 0.8f, -0.1f);

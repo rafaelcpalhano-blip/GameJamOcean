@@ -10,6 +10,7 @@ namespace GameJamOcean.Weapons
     {
         [Header("Projectile")]
         [SerializeField, Min(0f)] private float speed = 12f;
+        [SerializeField, Range(.1f, 1f)] private float flightSpeedMultiplier = 1f;
         [SerializeField, Min(0f)] private float damage = 1f;
         [SerializeField, Min(0.1f)] private float lifetime = 3f;
         [SerializeField] private LayerMask hittableLayers = ~0;
@@ -39,7 +40,7 @@ namespace GameJamOcean.Weapons
             direction.Normalize();
             owner = projectileOwner;
             transform.up = direction;
-            projectileRigidbody.linearVelocity = direction * speed;
+            projectileRigidbody.linearVelocity = direction * speed * flightSpeedMultiplier;
 
             IgnoreOwnerColliders();
             Destroy(gameObject, lifetime);

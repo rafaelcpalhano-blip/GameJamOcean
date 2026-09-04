@@ -9,6 +9,15 @@ namespace GameJamOcean.Boat
         [Header("Collision Damage")]
         [SerializeField, Min(0f)] private float damage = 10f;
         [SerializeField, Min(0f)] private float damageCooldown = 0.75f;
+        [SerializeField] private bool percentageOfMaximumHealth;
+        private BoatDamageObstacle3D sharedClock;
+
+        public void ConfigureRock(BoatDamageObstacle3D clock)
+        {
+            damage = 30f;
+            percentageOfMaximumHealth = true;
+            sharedClock = clock;
+        }
 
         private float nextAllowedDamageTime;
 
@@ -24,7 +33,8 @@ namespace GameJamOcean.Boat
 
         private void TryDamage(Collider other)
         {
-            if (damage <= 0f || Time.time < nextAllowedDamageTime)
+            var clock = sharedClock != null ? sharedClock : this;
+            if (GameJamOcean.UI.GameMenus.BlocksGameplay || damage <= 0f || Time.time < clock.nextAllowedDamageTime)
             {
                 return;
             }
@@ -35,8 +45,8 @@ namespace GameJamOcean.Boat
                 return;
             }
 
-            nextAllowedDamageTime = Time.time + damageCooldown;
-            boatHealth.TakeDamage(damage, gameObject);
+            clock.nextAllowedDamageTime = Time.time + damageCooldown;
+            boatHealth.TakeDamage(percentageOfMaximumHealth ? boatHealth.MaximumHealth * damage / 100f : damage, gameObject);
         }
 
         private void OnValidate()
