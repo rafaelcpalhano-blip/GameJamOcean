@@ -66,6 +66,11 @@ namespace GameJamOcean.Weapons
             }
         }
 
+        public void EquipHarpoon(HarpoonProjectile2D prefab)
+        {
+            if (prefab != null) harpoonPrefab = prefab;
+        }
+
         private void TryFire()
         {
             if (Time.time < nextFireTime || harpoonPrefab == null || aimCamera == null || Mouse.current == null)

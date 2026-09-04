@@ -1,4 +1,5 @@
 using GameJamOcean.Combat;
+using GameJamOcean.Progression;
 using UnityEngine;
 
 namespace GameJamOcean.Boat
@@ -61,10 +62,32 @@ namespace GameJamOcean.Boat
         {
             health ??= GetComponent<Health>();
             health.Died += OnBoatDestroyed;
+            if (GameProgress.HasInstance) GameProgress.Instance.UpgradesChanged += ApplyPurchasedUpgrades;
+        }
+
+        private void Start()
+        {
+            ApplyPurchasedUpgrades();
+            health.Restore();
+        }
+
+        private void ApplyPurchasedUpgrades()
+        {
+            if (!GameProgress.HasInstance || GameProgress.Instance.Catalog == null) return;
+            var progress = GameProgress.Instance;
+            var hull = progress.Catalog.Find(UpgradeKind.BoatHull);
+            var turbo = progress.Catalog.Find(UpgradeKind.BoatTurbo);
+            if (hull == null || turbo == null) return;
+            float ratio = health.NormalizedHealth;
+            healthUpgradePercent = hull.Tier(progress.GetLevel(UpgradeKind.BoatHull)).value;
+            turboCapacityUpgradePercent = turbo.Tier(progress.GetLevel(UpgradeKind.BoatTurbo)).value;
+            ApplyStats();
+            health.Heal(Mathf.Max(0f, health.MaximumHealth * ratio - health.CurrentHealth));
         }
 
         private void OnDisable()
         {
+            if (GameProgress.HasInstance) GameProgress.Instance.UpgradesChanged -= ApplyPurchasedUpgrades;
             if (health != null)
             {
                 health.Died -= OnBoatDestroyed;

@@ -17,6 +17,7 @@ namespace GameJamOcean.Interaction
         [SerializeField] private UnityEvent onInteracted = new();
         private float nextInteractionTime;
         public string Prompt => prompt;
+        public UnityEvent OnInteracted => onInteracted;
 
         private void Awake()
         {

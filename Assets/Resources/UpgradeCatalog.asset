@@ -1,0 +1,123 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6cdaadafe511e2141be9b33873685114, type: 3}
+  m_Name: UpgradeCatalog
+  m_EditorClassIdentifier: Assembly-CSharp::GameJamOcean.Progression.UpgradeCatalog
+  upgrades:
+  - kind: 0
+    displayName: Ilha / Aldeia
+    level1:
+      goldCost: 0
+      value: 0
+      harpoonPrefab: {fileID: 0}
+    level2:
+      goldCost: 200
+      value: 0
+      harpoonPrefab: {fileID: 0}
+    level3:
+      goldCost: 500
+      value: 0
+      harpoonPrefab: {fileID: 0}
+    islandLevel4:
+      goldCost: 900
+      value: 0
+      harpoonPrefab: {fileID: 0}
+  - kind: 1
+    displayName: "Barco \u2014 Casco"
+    level1:
+      goldCost: 0
+      value: 0
+      harpoonPrefab: {fileID: 0}
+    level2:
+      goldCost: 60
+      value: 15
+      harpoonPrefab: {fileID: 0}
+    level3:
+      goldCost: 120
+      value: 30
+      harpoonPrefab: {fileID: 0}
+    islandLevel4:
+      goldCost: 900
+      value: 0
+      harpoonPrefab: {fileID: 0}
+  - kind: 2
+    displayName: "Barco \u2014 Dura\xE7\xE3o do turbo"
+    level1:
+      goldCost: 0
+      value: 0
+      harpoonPrefab: {fileID: 0}
+    level2:
+      goldCost: 70
+      value: 20
+      harpoonPrefab: {fileID: 0}
+    level3:
+      goldCost: 140
+      value: 40
+      harpoonPrefab: {fileID: 0}
+    islandLevel4:
+      goldCost: 900
+      value: 0
+      harpoonPrefab: {fileID: 0}
+  - kind: 3
+    displayName: "Mergulhador \u2014 Vida"
+    level1:
+      goldCost: 0
+      value: 5
+      harpoonPrefab: {fileID: 0}
+    level2:
+      goldCost: 70
+      value: 7
+      harpoonPrefab: {fileID: 0}
+    level3:
+      goldCost: 140
+      value: 9
+      harpoonPrefab: {fileID: 0}
+    islandLevel4:
+      goldCost: 900
+      value: 0
+      harpoonPrefab: {fileID: 0}
+  - kind: 4
+    displayName: "Mergulhador \u2014 Velocidade"
+    level1:
+      goldCost: 0
+      value: 0
+      harpoonPrefab: {fileID: 0}
+    level2:
+      goldCost: 60
+      value: 15
+      harpoonPrefab: {fileID: 0}
+    level3:
+      goldCost: 120
+      value: 30
+      harpoonPrefab: {fileID: 0}
+    islandLevel4:
+      goldCost: 900
+      value: 0
+      harpoonPrefab: {fileID: 0}
+  - kind: 5
+    displayName: "Mergulhador \u2014 Arp\xE3o"
+    level1:
+      goldCost: 0
+      value: 0
+      harpoonPrefab: {fileID: 6356064606066188246, guid: ed9aa031b8c4a8b459c917475d0dba8b, type: 3}
+    level2:
+      goldCost: 80
+      value: 0
+      harpoonPrefab: {fileID: 4045878626627570333, guid: 3fe9d0d5b6ebcc449ba493ad4971c5dc, type: 3}
+    level3:
+      goldCost: 160
+      value: 0
+      harpoonPrefab: {fileID: 5990088422742600756, guid: a46e2a1e8fcf6f247963707d6d7dc50f, type: 3}
+    islandLevel4:
+      goldCost: 900
+      value: 0
+      harpoonPrefab: {fileID: 0}

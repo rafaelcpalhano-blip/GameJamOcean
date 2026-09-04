@@ -1,6 +1,9 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using GameJamOcean.World;
+using GameJamOcean.Progression;
+using GameJamOcean.Combat;
+using GameJamOcean.Weapons;
 
 namespace GameJamOcean.Player
 {
@@ -90,6 +93,20 @@ namespace GameJamOcean.Player
 
         private void Start()
         {
+            if (GameProgress.HasInstance && GameProgress.Instance.Catalog != null)
+            {
+                var progress = GameProgress.Instance;
+                var catalog = progress.Catalog;
+                var life = catalog.Find(UpgradeKind.DiverHealth);
+                var speed = catalog.Find(UpgradeKind.DiverSpeed);
+                var harpoon = catalog.Find(UpgradeKind.Harpoon);
+                if (life != null && TryGetComponent(out Health health))
+                    health.SetMaximumHealth(life.Tier(progress.GetLevel(UpgradeKind.DiverHealth)).value, true);
+                if (speed != null)
+                    maximumSpeed *= 1f + speed.Tier(progress.GetLevel(UpgradeKind.DiverSpeed)).value / 100f;
+                if (harpoon != null && TryGetComponent(out HarpoonLauncher2D launcher))
+                    launcher.EquipHarpoon(harpoon.Tier(progress.GetLevel(UpgradeKind.Harpoon)).harpoonPrefab);
+            }
             ChangeAnimation(downStateHash, 0f);
         }
 
