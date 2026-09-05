@@ -125,20 +125,30 @@ namespace GameJamOcean.World
             ParticleSystemRenderer renderer = particles.GetComponent<ParticleSystemRenderer>();
             Material template = Resources.Load<Material>("WindWebFallback");
             if (renderer == null || template == null) return;
-            Material original = renderer.sharedMaterial;
+            renderer.sharedMaterial = CreateWebMaterial(template, renderer.sharedMaterial);
+            if (particles.trails.enabled)
+                renderer.trailMaterial = CreateWebMaterial(template, renderer.trailMaterial);
+#endif
+        }
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+        private Material CreateWebMaterial(Material template, Material original)
+        {
             Material webMaterial = new Material(template) { name = "Wind URP Web Material (Runtime)" };
             Texture texture = null;
             if (original != null)
             {
-                if (original.HasProperty("_MainTexture")) texture = original.GetTexture("_MainTexture");
+                if (original.HasProperty("_BaseMap")) texture = original.GetTexture("_BaseMap");
+                if (texture == null && original.HasProperty("_MainTex")) texture = original.GetTexture("_MainTex");
+                if (texture == null && original.HasProperty("_MainTexture")) texture = original.GetTexture("_MainTexture");
                 if (texture == null && original.HasProperty("_CutoutTexture")) texture = original.GetTexture("_CutoutTexture");
                 if (texture == null && original.HasProperty("_OpacityTexture")) texture = original.GetTexture("_OpacityTexture");
             }
             if (texture != null) webMaterial.SetTexture("_BaseMap", texture);
-            renderer.sharedMaterial = webMaterial;
             webMaterials.Add(webMaterial);
-#endif
+            return webMaterial;
         }
+#endif
 
         private void OnDestroy()
         {

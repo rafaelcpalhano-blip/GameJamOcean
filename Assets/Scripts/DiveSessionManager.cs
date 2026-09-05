@@ -496,7 +496,7 @@ namespace GameJamOcean.Diving
             body.gravityScale = 0f;
             var collider = pickup.AddComponent<CircleCollider2D>();
             collider.isTrigger = true;
-            collider.radius = .45f;
+            collider.radius = .7f;
             pickup.AddComponent<DivePowerUpPickup2D>().Configure(kind, healthRestored, settings);
         }
 
@@ -589,11 +589,11 @@ namespace GameJamOcean.Diving
                     break;
                 case DivePowerUpKind.DoubleHarpoon:
                     diver.GetComponent<GameJamOcean.Weapons.HarpoonLauncher2D>()?.ActivateDoubleShot(
-                        settings != null ? settings.doubleHarpoonDuration : 7f,
+                        settings != null ? settings.doubleHarpoonDuration : 12f,
                         settings != null ? settings.doubleHarpoonAngle : 18f);
                     break;
                 case DivePowerUpKind.Shield:
-                    health.GrantImmunity(settings != null ? settings.shieldDuration : 5f);
+                    diver.ActivateShield(settings != null ? settings.shieldDuration : 5f);
                     break;
                 case DivePowerUpKind.Speed:
                     diver.ActivateSpeedBoost(settings != null ? settings.speedDuration : 7f,

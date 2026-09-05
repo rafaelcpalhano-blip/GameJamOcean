@@ -46,6 +46,15 @@ namespace GameJamOcean.Player
         private float knockbackUntil;
         private float speedBoostUntil;
         private float speedBoostMultiplier = 1f;
+        private float speedBoostDuration;
+        private float shieldUntil;
+        private float shieldDuration;
+        public float SpeedBoostRemaining => Mathf.Max(0f, speedBoostUntil - Time.time);
+        public float SpeedBoostNormalized => speedBoostDuration > 0f
+            ? Mathf.Clamp01(SpeedBoostRemaining / speedBoostDuration) : 0f;
+        public float ShieldRemaining => Mathf.Max(0f, shieldUntil - Time.time);
+        public float ShieldNormalized => shieldDuration > 0f
+            ? Mathf.Clamp01(ShieldRemaining / shieldDuration) : 0f;
         public float DashCooldownRemaining => Mathf.Max(0f, nextDashTime - Time.time);
         public bool IsDashing => enabled && Time.time < dashUntil;
         public void ApplyKnockback(Vector2 velocity, float duration)
@@ -57,8 +66,16 @@ namespace GameJamOcean.Player
 
         public void ActivateSpeedBoost(float duration, float multiplier)
         {
-            speedBoostUntil = Mathf.Max(speedBoostUntil, Time.time + Mathf.Max(.1f, duration));
+            speedBoostDuration = Mathf.Max(.1f, duration);
+            speedBoostUntil = Mathf.Max(speedBoostUntil, Time.time + speedBoostDuration);
             speedBoostMultiplier = Mathf.Max(speedBoostMultiplier, Mathf.Max(1f, multiplier));
+        }
+
+        public void ActivateShield(float duration)
+        {
+            shieldDuration = Mathf.Max(.1f, duration);
+            shieldUntil = Mathf.Max(shieldUntil, Time.time + shieldDuration);
+            health?.GrantImmunity(shieldDuration);
         }
 
         [Header("Movement Bounds")]

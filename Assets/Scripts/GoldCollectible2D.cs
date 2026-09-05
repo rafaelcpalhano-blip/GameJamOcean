@@ -20,7 +20,7 @@ namespace GameJamOcean.Collectibles
         [Header("References")]
         [SerializeField] private DiveSessionManager sessionManager;
         [Header("Player Attraction")]
-        [SerializeField, Min(.1f)] private float attractionRadius = .7f;
+        [SerializeField, Min(.1f)] private float attractionRadius = .35f;
         [SerializeField, Min(.1f)] private float attractionSpeed = 6f;
         [SerializeField, Min(.1f)] private float attractionAcceleration = 14f;
 

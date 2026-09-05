@@ -11,6 +11,9 @@ namespace GameJamOcean.Boat
         [SerializeField, Range(0f, 3f)] private float pitchDegrees = 0.6f;
         [SerializeField, Range(0f, 3f)] private float rollDegrees = 0.9f;
         [SerializeField, Range(0.05f, 1f)] private float frequency = 0.22f;
+        [Header("Turbo pitch")]
+        [SerializeField, Range(0f, 5f)] private float turboPitchDegrees = 1.4f;
+        [SerializeField, Min(.1f)] private float turboPitchResponse = 2.5f;
 
         private Vector3 restPosition;
         private Quaternion restRotation;
@@ -23,6 +26,8 @@ namespace GameJamOcean.Boat
         [SerializeField, Range(0f, .3f)] private float impactLift = .08f;
         private float impactStartedAt = float.NegativeInfinity;
         private float impactSide = 1f;
+        private BoatController3D controller;
+        private float turboPitchBlend;
 
         public void Configure(Transform model)
         {
@@ -43,6 +48,7 @@ namespace GameJamOcean.Boat
 
             restPosition = visualModel.localPosition;
             restRotation = visualModel.localRotation;
+            controller = GetComponent<BoatController3D>();
             hasRestPose = true;
             elapsed = 0f;
         }
@@ -56,11 +62,15 @@ namespace GameJamOcean.Boat
             float impactProgress = Mathf.Clamp01((Time.time - impactStartedAt) / impactDuration);
             float impactEnvelope = (1f - impactProgress) * (1f - impactProgress);
             float impactWave = Mathf.Sin(impactProgress * Mathf.PI * 3f) * impactEnvelope;
+            turboPitchBlend = Mathf.MoveTowards(turboPitchBlend,
+                controller != null && controller.IsTurboActive ? 1f : 0f,
+                turboPitchResponse * Time.deltaTime);
             visualModel.localPosition = restPosition
                 + Vector3.up * (Mathf.Sin(phase) * bobHeight * strength
                     + Mathf.Abs(impactWave) * impactLift);
             visualModel.localRotation = restRotation * Quaternion.Euler(
-                Mathf.Sin(phase * 0.83f) * pitchDegrees * strength + impactWave * impactPitchDegrees,
+                Mathf.Sin(phase * 0.83f) * pitchDegrees * strength + impactWave * impactPitchDegrees
+                    - turboPitchBlend * turboPitchDegrees,
                 0f,
                 Mathf.Sin(phase * 0.67f + 0.8f) * rollDegrees * strength
                     + impactWave * impactRollDegrees * impactSide);

@@ -30,10 +30,15 @@ namespace GameJamOcean.Weapons
         private float nextFireTime;
         private float doubleShotUntil;
         private float doubleShotAngle = 18f;
+        private float doubleShotDuration;
+        public float DoubleShotRemaining => Mathf.Max(0f, doubleShotUntil - Time.time);
+        public float DoubleShotNormalized => doubleShotDuration > 0f
+            ? Mathf.Clamp01(DoubleShotRemaining / doubleShotDuration) : 0f;
 
         public void ActivateDoubleShot(float duration, float angle)
         {
-            doubleShotUntil = Mathf.Max(doubleShotUntil, Time.time + Mathf.Max(.1f, duration));
+            doubleShotDuration = Mathf.Max(.1f, duration);
+            doubleShotUntil = Mathf.Max(doubleShotUntil, Time.time + doubleShotDuration);
             doubleShotAngle = Mathf.Clamp(angle, 1f, 60f);
         }
 

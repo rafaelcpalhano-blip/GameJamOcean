@@ -296,6 +296,7 @@ namespace GameJamOcean.UI
 
         private void ShowHome()
         {
+            if (main) gameAudio.EnsureAmbiencePlaying();
             ClearPanel(main ? "GAME JAM OCEAN" : "PAUSADO");
             if (main)
             {

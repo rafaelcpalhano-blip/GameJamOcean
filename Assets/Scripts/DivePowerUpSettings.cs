@@ -13,7 +13,7 @@ namespace GameJamOcean.Diving
         public Sprite speedSprite;
 
         [Header("Double harpoon")]
-        [Min(.1f)] public float doubleHarpoonDuration = 7f;
+        [Min(.1f)] public float doubleHarpoonDuration = 12f;
         [Range(1f, 60f)] public float doubleHarpoonAngle = 18f;
 
         [Header("Shield")]

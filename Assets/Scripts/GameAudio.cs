@@ -60,6 +60,10 @@ namespace GameJamOcean.Audio
             if (scene == "DiveScene" && settings.diveRandomAmbience != null)
                 randomSounds = StartCoroutine(RandomDiveSounds());
         }
+        public void EnsureAmbiencePlaying()
+        {
+            if (ambience.clip != null && !ambience.isPlaying) ambience.Play();
+        }
         private IEnumerator RandomDiveSounds()
         {
             while (true)
