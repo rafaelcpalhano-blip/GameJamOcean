@@ -11,6 +11,21 @@ using GameJamOcean.World;
 
 namespace GameJamOcean.Diving
 {
+    [Serializable]
+    public sealed class FinalRewardTier
+    {
+        [Min(0)] public int minimumGold;
+        [Min(0)] public int maximumGold;
+        [Min(1f)] public float excellentTimeSeconds;
+        [Min(.01f)] public float excellentKillsPerSecond;
+
+        public FinalRewardTier(int minimum, int maximum, float time, float killsPerSecond)
+        {
+            minimumGold = minimum; maximumGold = maximum;
+            excellentTimeSeconds = time; excellentKillsPerSecond = killsPerSecond;
+        }
+    }
+
     public enum DiveSessionState
     {
         NotStarted,
@@ -38,6 +53,18 @@ namespace GameJamOcean.Diving
             new(9, 15, 37, 10, 25, 25, 25, 25),
             new(12, 16, 42, 15, 15, 10, 30, 30)
         };
+        [Header("Final Chest Performance Reward")]
+        [SerializeField] private FinalRewardTier[] finalRewardTiers =
+        {
+            new(100, 250, 75f, .36f),
+            new(125, 300, 82f, .37f),
+            new(175, 350, 90f, .37f),
+            new(225, 425, 98f, .38f),
+            new(300, 500, 108f, .39f)
+        };
+        [SerializeField, Range(0f, 1f)] private float timeScoreWeight = .4f;
+        [SerializeField, Range(0f, 1f)] private float damageScoreWeight = .3f;
+        [SerializeField, Range(0f, 1f)] private float killRateScoreWeight = .3f;
         public DiveDifficultyTier ActiveDifficulty { get; private set; }
 
         [Header("Chest Milestones (%)")]
@@ -122,6 +149,8 @@ namespace GameJamOcean.Diving
         private readonly HashSet<EnemyController2D> registeredEnemies = new();
         private bool[] releasedMilestones;
         private DivePowerUpSpawner2D powerUpSpawner;
+        private float sessionStartedAt;
+        private float playerDamageTaken;
 
         private void Awake()
         {
@@ -154,7 +183,11 @@ namespace GameJamOcean.Diving
             {
                 int points = 0;
                 if (GameProgress.HasInstance)
-                    foreach (UpgradeKind kind in Enum.GetValues(typeof(UpgradeKind))) points += GameProgress.Instance.GetLevel(kind) - 1;
+                {
+                    UpgradeKind[] difficultyUpgrades = { UpgradeKind.Island, UpgradeKind.BoatHull,
+                        UpgradeKind.DiverHealth, UpgradeKind.DiverSpeed, UpgradeKind.Harpoon };
+                    foreach (UpgradeKind kind in difficultyUpgrades) points += GameProgress.Instance.GetLevel(kind) - 1;
+                }
                 int[] thresholds = new int[difficultyTiers.Length];
                 for (int i = 0; i < difficultyTiers.Length; i++)
                     thresholds[i] = difficultyTiers[i] != null ? difficultyTiers[i].minimumPurchasedUpgrades : -1;
@@ -175,6 +208,8 @@ namespace GameJamOcean.Diving
             finalRewardGold = 0;
             releasedMilestones = new bool[chestMilestones.Count];
             sessionState = DiveSessionState.Running;
+            sessionStartedAt = Time.time;
+            playerDamageTaken = 0f;
 
             if (!TryGetComponent(out powerUpSpawner))
                 powerUpSpawner = gameObject.AddComponent<DivePowerUpSpawner2D>();
@@ -250,6 +285,28 @@ namespace GameJamOcean.Diving
             sessionState = DiveSessionState.Won;
             onVictory?.Invoke();
             SessionWon?.Invoke();
+        }
+
+        public int CalculateFinalChestReward()
+        {
+            int index = Mathf.Clamp(difficultyLevel - 1, 0,
+                finalRewardTiers != null ? finalRewardTiers.Length - 1 : 0);
+            if (finalRewardTiers == null || finalRewardTiers.Length == 0) return 0;
+            FinalRewardTier tier = finalRewardTiers[index];
+            float elapsed = Mathf.Max(1f, Time.time - sessionStartedAt);
+            float timeScore = Mathf.InverseLerp(tier.excellentTimeSeconds * 1.8f,
+                tier.excellentTimeSeconds, elapsed);
+            float damageScore = playerHealth != null && playerHealth.MaximumHealth > 0f
+                ? 1f - Mathf.Clamp01(playerDamageTaken / playerHealth.MaximumHealth) : 1f;
+            float killRate = killedEnemies / elapsed;
+            float killRateScore = Mathf.InverseLerp(tier.excellentKillsPerSecond * .45f,
+                tier.excellentKillsPerSecond, killRate);
+            float totalWeight = Mathf.Max(.001f,
+                timeScoreWeight + damageScoreWeight + killRateScoreWeight);
+            float score = (timeScore * timeScoreWeight + damageScore * damageScoreWeight
+                + killRateScore * killRateScoreWeight) / totalWeight;
+            return Mathf.RoundToInt(Mathf.Lerp(tier.minimumGold, tier.maximumGold,
+                Mathf.Clamp01(score)));
         }
 
         public void MarkDefeat()
@@ -350,6 +407,8 @@ namespace GameJamOcean.Diving
 
             playerHealth.Died -= HandlePlayerDied;
             playerHealth.Died += HandlePlayerDied;
+            playerHealth.Damaged -= HandlePlayerDamaged;
+            playerHealth.Damaged += HandlePlayerDamaged;
         }
 
         private void UnsubscribeFromPlayer()
@@ -357,7 +416,13 @@ namespace GameJamOcean.Diving
             if (playerHealth != null)
             {
                 playerHealth.Died -= HandlePlayerDied;
+                playerHealth.Damaged -= HandlePlayerDamaged;
             }
+        }
+
+        private void HandlePlayerDamaged(Health health, GameObject source)
+        {
+            playerDamageTaken += Mathf.Max(0f, health.LastDamageAmount);
         }
 
         private void UnsubscribeFromAllEnemies()
@@ -414,6 +479,7 @@ namespace GameJamOcean.Diving
         private DivePowerUpSettings settings;
         private int nextSpawnMilestone;
         private int previousPoint = -1;
+        private DivePowerUpKind? previousKind;
 
         public void Configure(DiveSessionManager owner)
         {
@@ -426,6 +492,7 @@ namespace GameJamOcean.Diving
             settings = Resources.Load<DivePowerUpSettings>("DivePowerUpSettings");
             nextSpawnMilestone = 0;
             previousPoint = -1;
+            previousKind = null;
             BuildSchedule();
             GenerateCandidatePoints();
             if (session != null) session.CompletionPercentageChanged += HandleProgress;
@@ -483,9 +550,7 @@ namespace GameJamOcean.Diving
             if (candidatePoints.Count == 0 || playerHealth == null || maskSprite == null) return;
             int selected = SelectPoint();
             previousPoint = selected;
-            DivePowerUpKind kind = settings != null
-                ? (DivePowerUpKind)UnityEngine.Random.Range(0, 4)
-                : DivePowerUpKind.Health;
+            DivePowerUpKind kind = SelectPowerUpKind();
             var pickup = new GameObject($"PowerUp_{kind}");
             pickup.transform.position = candidatePoints[selected];
             pickup.transform.localScale = Vector3.one * (settings != null ? settings.pickupScale : .8f);
@@ -498,6 +563,38 @@ namespace GameJamOcean.Diving
             collider.isTrigger = true;
             collider.radius = .7f;
             pickup.AddComponent<DivePowerUpPickup2D>().Configure(kind, healthRestored, settings);
+        }
+
+        private DivePowerUpKind SelectPowerUpKind()
+        {
+            if (settings == null) return DivePowerUpKind.Health;
+            bool allowDoubleHarpoon = !GameProgress.HasInstance
+                || GameProgress.Instance.GetLevel(UpgradeKind.Harpoon) < 4;
+            float total = 0f;
+            float[] weights = new float[4];
+            for (int i = 0; i < weights.Length; i++)
+            {
+                if (i == (int)DivePowerUpKind.DoubleHarpoon && !allowDoubleHarpoon)
+                {
+                    weights[i] = 0f;
+                    continue;
+                }
+                float weight = i == (int)DivePowerUpKind.Health && session != null
+                    && session.DifficultyLevel >= 3 ? 1.55f : 1f;
+                if (previousKind.HasValue && i == (int)previousKind.Value) weight *= .22f;
+                weights[i] = weight;
+                total += weight;
+            }
+            float roll = UnityEngine.Random.value * total;
+            for (int i = 0; i < weights.Length; i++)
+            {
+                roll -= weights[i];
+                if (roll > 0f) continue;
+                previousKind = (DivePowerUpKind)i;
+                return previousKind.Value;
+            }
+            previousKind = DivePowerUpKind.Health;
+            return previousKind.Value;
         }
 
         private void CreateVisuals(Transform root, DivePowerUpKind kind, SpriteRenderer playerRenderer)

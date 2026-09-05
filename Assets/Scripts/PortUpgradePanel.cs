@@ -51,10 +51,15 @@ namespace GameJamOcean.Progression
         private GameObject modal;
         private TMP_Text goldLabel;
         private TMP_Text statusLabel;
-        private readonly Button[] buttons = new Button[6];
-        private readonly TMP_Text[] labels = new TMP_Text[6];
-        private readonly TMP_Text[] prices = new TMP_Text[6];
-        private readonly int[] offeredLevels = new int[6];
+        private static readonly UpgradeKind[] VisibleUpgrades =
+        {
+            UpgradeKind.Island, UpgradeKind.BoatHull, UpgradeKind.DiverHealth,
+            UpgradeKind.DiverSpeed, UpgradeKind.Harpoon
+        };
+        private readonly Button[] buttons = new Button[5];
+        private readonly TMP_Text[] labels = new TMP_Text[5];
+        private readonly TMP_Text[] prices = new TMP_Text[5];
+        private readonly int[] offeredLevels = new int[5];
         private bool isOpen;
         private bool wasMoving;
         private bool wasInteracting;
@@ -97,6 +102,17 @@ namespace GameJamOcean.Progression
             previousCursorLock = Cursor.lockState;
             previousCursorVisible = Cursor.visible;
             isOpen = true;
+            if (boat != null)
+            {
+                Rigidbody body = boat.GetComponent<Rigidbody>();
+                boat.transform.SetPositionAndRotation(boat.DockPosition, boat.DockRotation);
+                if (body != null)
+                {
+                    body.position = boat.DockPosition; body.rotation = boat.DockRotation;
+                    body.linearVelocity = Vector3.zero; body.angularVelocity = Vector3.zero;
+                }
+            }
+            FindFirstObjectByType<GameJamOcean.CameraSystem.CameraFollow3D>()?.ShowMenuView();
             if (boat != null) boat.enabled = false;
             if (interactor != null) interactor.enabled = false;
             Time.timeScale = 0f;
@@ -117,6 +133,7 @@ namespace GameJamOcean.Progression
             Cursor.visible = previousCursorVisible;
             if (boat != null && wasMoving && (!boat.TryGetComponent(out Health health) || !health.IsDead)) boat.enabled = true;
             if (interactor != null && wasInteracting) interactor.enabled = true;
+            FindFirstObjectByType<GameJamOcean.CameraSystem.CameraFollow3D>()?.ReturnFromMenuView(.5f);
         }
 
         private void OnDisable() { Close(); }
@@ -154,9 +171,16 @@ namespace GameJamOcean.Progression
             nextPurchaseTime = Time.unscaledTime + 0.35f;
             if (index == 0 && (villageLevel1 == null || villageLevel2 == null || villageLevel3 == null || villageLevel4 == null))
             { statusLabel.text = "Configure as quatro versões da aldeia antes de comprar."; return; }
-            progress.TryPurchase((UpgradeKind)index, offeredLevels[index], out string message);
+            UpgradeKind kind = VisibleUpgrades[index];
+            bool completedBefore = progress.IsGameCompleted;
+            progress.TryPurchase(kind, offeredLevels[index], out string message);
             statusLabel.text = progress.IsGameCompleted ? "Aldeia N4 — jogo concluído!" : message;
             Refresh();
+            if (!completedBefore && progress.IsGameCompleted)
+            {
+                Close();
+                EndGameCelebration3D.Show(villageLevel4);
+            }
         }
 
         private void Refresh()
@@ -173,14 +197,15 @@ namespace GameJamOcean.Progression
             }
             string error = "Catálogo ausente. Execute Configure Upgrade System.";
             bool valid = progress.Catalog != null && progress.Catalog.Validate(out error);
-            for (int i = 0; i < 6; i++)
+            for (int i = 0; i < VisibleUpgrades.Length; i++)
             {
-                int level = progress.GetLevel((UpgradeKind)i);
+                UpgradeKind kind = VisibleUpgrades[i];
+                int level = progress.GetLevel(kind);
                 offeredLevels[i] = level;
-                var definition = progress.Catalog != null ? progress.Catalog.Find((UpgradeKind)i) : null;
+                var definition = progress.Catalog != null ? progress.Catalog.Find(kind) : null;
                 if (!valid || definition == null)
                 {
-                    labels[i].text = ((UpgradeKind)i).ToString();
+                    labels[i].text = kind.ToString();
                     prices[i].text = "Indisponível";
                     buttons[i].interactable = false;
                     continue;
@@ -191,7 +216,7 @@ namespace GameJamOcean.Progression
                     (maximum ? "\nNível máximo" : $"\nN{level + 1}: {Describe(definition.kind, next, level + 1)}");
                 prices[i].text = maximum ? "MÁXIMO" : $"{next.goldCost} OURO\nCOMPRAR";
                 buttons[i].interactable = !maximum && progress.TotalGold >= next.goldCost;
-                if (i == 0 && (villageLevel1 == null || villageLevel2 == null || villageLevel3 == null || villageLevel4 == null)) buttons[i].interactable = false;
+                if (kind == UpgradeKind.Island && (villageLevel1 == null || villageLevel2 == null || villageLevel3 == null || villageLevel4 == null)) buttons[i].interactable = false;
             }
             if (!valid) statusLabel.text = error;
         }
@@ -199,8 +224,14 @@ namespace GameJamOcean.Progression
         private static string Describe(UpgradeKind kind, UpgradeTier tier, int level)
         {
             if (kind == UpgradeKind.Island) return level == 4 ? "Aldeia final — conclusão do jogo" : "Nova aparência da aldeia";
-            if (kind == UpgradeKind.Harpoon) return tier.harpoonPrefab != null ? tier.harpoonPrefab.name : "Prefab ausente";
+            if (kind == UpgradeKind.Harpoon) return level == 4 ? "Disparo duplo permanente" : tier.harpoonPrefab != null ? tier.harpoonPrefab.name : "Prefab ausente";
             if (kind == UpgradeKind.DiverHealth) return $"{tier.value:0} pontos de vida";
+            if (kind == UpgradeKind.BoatHull)
+            {
+                var turbo = GameProgress.HasInstance ? GameProgress.Instance.Catalog?.Find(UpgradeKind.BoatTurbo) : null;
+                float turboValue = turbo != null ? turbo.Tier(level).value : 0f;
+                return $"Casco +{tier.value:0.#}% / Turbo +{turboValue:0.#}%";
+            }
             return $"+{tier.value:0.#}% sobre o valor inicial";
         }
 
@@ -218,16 +249,16 @@ namespace GameJamOcean.Progression
             RectTransform shade = Rect("Dim Background", modal.transform, Vector2.zero, Vector2.zero);
             shade.anchorMin = Vector2.zero; shade.anchorMax = Vector2.one;
             shade.offsetMin = shade.offsetMax = Vector2.zero;
-            shade.gameObject.AddComponent<Image>().color = new Color(0, 0, 0, 0.65f);
+            shade.gameObject.AddComponent<Image>().color = new Color(0, 0, 0, 0.16f);
             RectTransform panel = Rect("Port Upgrades", modal.transform, new Vector2(900, 800), Vector2.zero);
             panel.anchorMin = panel.anchorMax = panel.pivot = new Vector2(0.5f, 0.5f);
-            panel.gameObject.AddComponent<Image>().color = new Color(0.025f, 0.10f, 0.14f, 1);
+            panel.gameObject.AddComponent<Image>().color = new Color(0.025f, 0.10f, 0.14f, .72f);
             Label("Title", panel, new Vector2(700, 40), new Vector2(-45, -22), "UPGRADES DO PORTO", 30);
             goldLabel = Label("Gold", panel, new Vector2(800, 35), new Vector2(0, -75), "OURO", 24);
             Button close = ButtonUI("Close", panel, new Vector2(90, 40), new Vector2(380, -22), out TMP_Text closeText);
             closeText.text = "FECHAR";
             close.onClick.AddListener(Close);
-            for (int i = 0; i < 6; i++)
+            for (int i = 0; i < VisibleUpgrades.Length; i++)
             {
                 RectTransform row = Rect($"Upgrade {i}", panel, new Vector2(830, 65), new Vector2(0, -130 - i * 75));
                 row.gameObject.AddComponent<Image>().color = new Color(0.06f, 0.19f, 0.23f, 1);
@@ -237,9 +268,9 @@ namespace GameJamOcean.Progression
                 int index = i;
                 buttons[i].onClick.AddListener(() => Buy(index));
             }
-            repairButton = ButtonUI("Repair Boat", panel, new Vector2(650, 55), new Vector2(0, -595), out repairPrice);
+            repairButton = ButtonUI("Repair Boat", panel, new Vector2(650, 55), new Vector2(0, -520), out repairPrice);
             repairButton.onClick.AddListener(RepairBoat);
-            statusLabel = Label("Status", panel, new Vector2(820, 90), new Vector2(0, -675), "", 21);
+            statusLabel = Label("Status", panel, new Vector2(820, 90), new Vector2(0, -600), "", 21);
             modal.SetActive(false);
         }
 

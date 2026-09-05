@@ -32,7 +32,7 @@ MonoBehaviour:
       value: 0
       harpoonPrefab: {fileID: 0}
   - kind: 1
-    displayName: "Barco \u2014 Casco"
+    displayName: "N\xEDvel da Embarca\xE7\xE3o"
     level1:
       goldCost: 0
       value: 0
@@ -118,6 +118,6 @@ MonoBehaviour:
       value: 0
       harpoonPrefab: {fileID: 5990088422742600756, guid: a46e2a1e8fcf6f247963707d6d7dc50f, type: 3}
     islandLevel4:
-      goldCost: 900
+      goldCost: 280
       value: 0
-      harpoonPrefab: {fileID: 0}
+      harpoonPrefab: {fileID: 5990088422742600756, guid: a46e2a1e8fcf6f247963707d6d7dc50f, type: 3}

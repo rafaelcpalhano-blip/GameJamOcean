@@ -84,9 +84,10 @@ namespace GameJamOcean.Boat
             var hull = progress.Catalog.Find(UpgradeKind.BoatHull);
             var turbo = progress.Catalog.Find(UpgradeKind.BoatTurbo);
             if (hull == null || turbo == null) return;
+            int vesselLevel = progress.GetLevel(UpgradeKind.BoatHull);
             float ratio = health.NormalizedHealth;
-            healthUpgradePercent = hull.Tier(progress.GetLevel(UpgradeKind.BoatHull)).value;
-            turboCapacityUpgradePercent = turbo.Tier(progress.GetLevel(UpgradeKind.BoatTurbo)).value;
+            healthUpgradePercent = hull.Tier(vesselLevel).value;
+            turboCapacityUpgradePercent = turbo.Tier(vesselLevel).value;
             ApplyStats();
             health.Heal(Mathf.Max(0f, health.MaximumHealth * ratio - health.CurrentHealth));
         }

@@ -20,7 +20,8 @@ namespace GameJamOcean.Collectibles
         [Header("References")]
         [SerializeField] private DiveSessionManager sessionManager;
         [Header("Player Attraction")]
-        [SerializeField, Min(.1f)] private float attractionRadius = .35f;
+        [SerializeField, Min(.05f)] private float attractionRadius = .175f;
+        [SerializeField, Min(.02f)] private float collectionRadius = .12f;
         [SerializeField, Min(.1f)] private float attractionSpeed = 6f;
         [SerializeField, Min(.1f)] private float attractionAcceleration = 14f;
 
@@ -48,6 +49,7 @@ namespace GameJamOcean.Collectibles
             }
             DiverController diver = FindFirstObjectByType<DiverController>();
             player = diver != null ? diver.transform : null;
+            if (diver != null) attractionRadius = diver.PowerUpDetectionRadius;
         }
 
         private void Update()
@@ -57,10 +59,16 @@ namespace GameJamOcean.Collectibles
             {
                 DiverController diver = FindFirstObjectByType<DiverController>();
                 player = diver != null ? diver.transform : null;
+                if (diver != null) attractionRadius = diver.PowerUpDetectionRadius;
             }
             if (player == null) return;
             Vector3 delta = player.position - transform.position;
             delta.z = 0f;
+            if (delta.sqrMagnitude <= collectionRadius * collectionRadius)
+            {
+                Collect();
+                return;
+            }
             if (delta.sqrMagnitude > attractionRadius * attractionRadius)
             {
                 currentAttractionSpeed = 0f;
@@ -74,7 +82,9 @@ namespace GameJamOcean.Collectibles
 
         private void OnTriggerEnter2D(Collider2D other)
         {
-            if (collected || other.GetComponentInParent<DiverController>() == null)
+            DiverController diver = other.GetComponentInParent<DiverController>();
+            if (collected || diver == null
+                || Vector2.Distance(transform.position, diver.transform.position) > collectionRadius)
             {
                 return;
             }
@@ -148,6 +158,8 @@ namespace GameJamOcean.Collectibles
         private void OnValidate()
         {
             goldValue = Mathf.Max(1, goldValue);
+            attractionRadius = Mathf.Max(.05f, attractionRadius);
+            collectionRadius = Mathf.Clamp(collectionRadius, .02f, attractionRadius);
         }
     }
 }

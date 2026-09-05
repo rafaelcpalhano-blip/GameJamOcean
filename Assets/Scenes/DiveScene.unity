@@ -3058,8 +3058,8 @@ MonoBehaviour:
   dashCooldown: 5
   dashSteeringAngle: 30
   dashSteeringSpeed: 240
-  dashDuration: 0.25
-  dashSpeedMultiplier: 3
+  dashDuration: 0.21
+  dashSpeedMultiplier: 2.65
   bubbleInterval: 0.035
   bubbleLifetime: 1.2
   movementBounds: {fileID: 374188107}

@@ -12,7 +12,7 @@ namespace GameJamOcean.Boat
         [SerializeField, Range(0f, 3f)] private float rollDegrees = 0.9f;
         [SerializeField, Range(0.05f, 1f)] private float frequency = 0.22f;
         [Header("Turbo pitch")]
-        [SerializeField, Range(0f, 5f)] private float turboPitchDegrees = 1.4f;
+        [SerializeField, Range(0f, 8f)] private float turboPitchDegrees = 6f;
         [SerializeField, Min(.1f)] private float turboPitchResponse = 2.5f;
 
         private Vector3 restPosition;
@@ -20,10 +20,10 @@ namespace GameJamOcean.Boat
         private float elapsed;
         private bool hasRestPose;
         [Header("Collision Impact")]
-        [SerializeField, Min(.05f)] private float impactDuration = .85f;
-        [SerializeField, Range(0f, 8f)] private float impactPitchDegrees = 3.2f;
-        [SerializeField, Range(0f, 8f)] private float impactRollDegrees = 4.5f;
-        [SerializeField, Range(0f, .3f)] private float impactLift = .08f;
+        [SerializeField, Min(.05f)] private float impactDuration = 1.05f;
+        [SerializeField, Range(0f, 10f)] private float impactPitchDegrees = 4.2f;
+        [SerializeField, Range(0f, 10f)] private float impactRollDegrees = 6f;
+        [SerializeField, Range(0f, .3f)] private float impactLift = .12f;
         private float impactStartedAt = float.NegativeInfinity;
         private float impactSide = 1f;
         private BoatController3D controller;
@@ -32,6 +32,12 @@ namespace GameJamOcean.Boat
         public void Configure(Transform model)
         {
             visualModel = model;
+            if (isActiveAndEnabled && visualModel != null)
+            {
+                restPosition = visualModel.localPosition;
+                restRotation = visualModel.localRotation;
+                hasRestPose = true;
+            }
         }
 
         private void OnEnable()

@@ -161,7 +161,9 @@ namespace GameJamOcean.Rewards
             }
 
             opened = true;
-            awardedGold = Random.Range(minimumGold, maximumGold + 1);
+            awardedGold = chestType == ChestRewardType.Final
+                ? sessionManager.CalculateFinalChestReward()
+                : Random.Range(minimumGold, maximumGold + 1);
             SpriteRenderer visual = GetComponentInChildren<SpriteRenderer>();
             Sprite chestIcon = visual != null ? visual.sprite : null;
             if (rewardCoinSprite == null)

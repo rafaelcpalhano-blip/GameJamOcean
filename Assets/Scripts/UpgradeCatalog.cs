@@ -24,9 +24,9 @@ namespace GameJamOcean.Progression
         public UpgradeTier level1 = new(0, 0);
         public UpgradeTier level2 = new(50, 15);
         public UpgradeTier level3 = new(100, 30);
-        [Tooltip("Usado somente para Ilha/Aldeia. Outros upgrades terminam no N3.")]
+        [Tooltip("Usado pela Ilha/Aldeia e pelo Arpão no nível 4.")]
         public UpgradeTier islandLevel4 = new(900, 0);
-        public int MaximumLevel => kind == UpgradeKind.Island ? 4 : 3;
+        public int MaximumLevel => kind == UpgradeKind.Island || kind == UpgradeKind.Harpoon ? 4 : 3;
         public UpgradeDefinition(UpgradeKind id, string title, float v1, float v2, float v3, int c2, int c3)
         {
             kind = id; displayName = title;

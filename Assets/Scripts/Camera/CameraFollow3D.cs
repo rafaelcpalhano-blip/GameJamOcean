@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -29,12 +30,79 @@ namespace GameJamOcean.CameraSystem
         public float MenuTransitionSeconds => menuTransitionSeconds;
         private Vector3 introPosition;
         private Quaternion introRotation;
+        private Coroutine menuReturn;
+        private bool cinematicCamera;
+        private Vector3 endGameCenter;
+        private Vector3 endGameOrbitOffset;
+        private float endGameOrbitAngle;
+        [SerializeField, Min(.1f)] private float endGameOrbitDegreesPerSecond = 5f;
 
         public void ShowMenuView()
         {
+            StopCinematicMotion();
             introPosition = menuViewPoint != null ? menuViewPoint.position : menuPosition;
             introRotation = menuViewPoint != null ? menuViewPoint.rotation : Quaternion.Euler(menuAngles);
             transform.SetPositionAndRotation(introPosition, introRotation);
+        }
+
+        public void ReturnFromMenuView(float durationMultiplier = 1f)
+        {
+            if (menuReturn != null) StopCoroutine(menuReturn);
+            menuReturn = StartCoroutine(ReturnFromMenu(Mathf.Max(.1f,
+                menuTransitionSeconds * Mathf.Max(.05f, durationMultiplier))));
+        }
+
+        private IEnumerator ReturnFromMenu(float duration)
+        {
+            cinematicCamera = true;
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                EvaluateMenuTransition(elapsed / duration);
+                elapsed += Time.unscaledDeltaTime;
+                yield return null;
+            }
+            EvaluateMenuTransition(1f);
+            cinematicCamera = false;
+            menuReturn = null;
+        }
+
+        public void BeginEndGameOrbit(Vector3 center)
+        {
+            StopCinematicMotion();
+            cinematicCamera = true;
+            endGameCenter = center;
+            Vector3 menu = menuViewPoint != null ? menuViewPoint.position : menuPosition;
+            endGameOrbitOffset = menu - center;
+            endGameOrbitAngle = 0f;
+            UpdateEndGameOrbit(0f);
+        }
+
+        public void EndEndGameOrbit()
+        {
+            cinematicCamera = false;
+            introPosition = transform.position;
+            introRotation = transform.rotation;
+            ReturnFromMenuView(.5f);
+        }
+
+        private void StopCinematicMotion()
+        {
+            if (menuReturn != null) StopCoroutine(menuReturn);
+            menuReturn = null;
+            cinematicCamera = false;
+        }
+
+        private void UpdateEndGameOrbit(float deltaTime)
+        {
+            endGameOrbitAngle += endGameOrbitDegreesPerSecond * deltaTime;
+            Vector3 horizontal = Quaternion.Euler(0f, endGameOrbitAngle, 0f)
+                * new Vector3(endGameOrbitOffset.x, 0f, endGameOrbitOffset.z);
+            Vector3 position = endGameCenter + horizontal;
+            position.y = endGameCenter.y + endGameOrbitOffset.y;
+            Vector3 look = endGameCenter - position;
+            transform.SetPositionAndRotation(position,
+                look.sqrMagnitude > .001f ? Quaternion.LookRotation(look, Vector3.up) : transform.rotation);
         }
 
         public void ShowRescueView()
@@ -128,11 +196,11 @@ namespace GameJamOcean.CameraSystem
         [SerializeField, Range(0.05f, 0.5f)] private float motionFrequency = 0.18f;
 
         [Header("Collision Impact")]
-        [SerializeField, Min(.05f)] private float impactDuration = .8f;
-        [SerializeField, Range(0f, 1f)] private float impactRecoilDistance = .65f;
-        [SerializeField, Range(0f, .3f)] private float impactShakeDistance = .14f;
-        [SerializeField, Range(0f, 3f)] private float impactRollDegrees = 1.2f;
-        [SerializeField, Min(1f)] private float impactShakeFrequency = 10f;
+        [SerializeField, Min(.05f)] private float impactDuration = 1.1f;
+        [SerializeField, Range(0f, 1.5f)] private float impactRecoilDistance = .9f;
+        [SerializeField, Range(0f, .4f)] private float impactShakeDistance = .22f;
+        [SerializeField, Range(0f, 4f)] private float impactRollDegrees = 1.8f;
+        [SerializeField, Min(1f)] private float impactShakeFrequency = 5f;
         private float impactStartedAt = float.NegativeInfinity;
         private Vector3 impactDirection;
 
@@ -165,6 +233,11 @@ namespace GameJamOcean.CameraSystem
 
         private void LateUpdate()
         {
+            if (cinematicCamera)
+            {
+                if (menuReturn == null) UpdateEndGameOrbit(Time.unscaledDeltaTime);
+                return;
+            }
             if (GameJamOcean.UI.GameMenus.BlocksGameplay) return;
             if (target == null)
             {
@@ -215,6 +288,18 @@ namespace GameJamOcean.CameraSystem
             impactDirection = worldPushDirection.sqrMagnitude > .001f
                 ? worldPushDirection.normalized : transform.forward;
             impactStartedAt = Time.time;
+        }
+
+        public void SnapBehindTarget()
+        {
+            if (target == null) return;
+            heading = target.eulerAngles.y;
+            headingVelocity = desiredOrbitYaw = orbitYaw = orbitVelocity = 0f;
+            desiredLookElevation = lookElevation = elevationVelocity = 0f;
+            followVelocity = Vector3.zero;
+            basePosition = target.position + GetRotatedOffset();
+            LookAtTarget(true);
+            transform.SetPositionAndRotation(basePosition, baseRotation);
         }
 
         private Vector3 GetRotatedOffset()

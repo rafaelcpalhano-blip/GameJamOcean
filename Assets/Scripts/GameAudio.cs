@@ -31,6 +31,12 @@ namespace GameJamOcean.Audio
             SetBackground(PlayerPrefs.GetFloat("GameJamOcean.Settings.Background", 1f));
             SetEffects(PlayerPrefs.GetFloat("GameJamOcean.Settings.Effects", 1f));
         }
+        private void Update()
+        {
+            // Loop is the primary mechanism; this also recovers after WebGL focus/audio-context interruptions.
+            if (ambience != null && ambience.clip != null && !ambience.isPlaying && !AudioListener.pause)
+                ambience.Play();
+        }
         public void SetBackground(float value)
         {
             BackgroundVolume = Mathf.Clamp01(value);

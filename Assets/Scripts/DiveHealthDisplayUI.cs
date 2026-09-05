@@ -110,7 +110,7 @@ namespace GameJamOcean.UI
         private sealed class Slot
         {
             public RectTransform root;
-            public Image fill;
+            public RectTransform fill;
         }
 
         private DiverController diver;
@@ -126,7 +126,7 @@ namespace GameJamOcean.UI
             settings = Resources.Load<DivePowerUpSettings>("DivePowerUpSettings");
             Canvas canvas = GetComponentInParent<Canvas>();
             if (canvas == null || settings == null) { enabled = false; return; }
-            row = Rect("Active Power Ups", canvas.transform, new Vector2(300, 46));
+            row = Rect("Active Power Ups", canvas.transform, new Vector2(460, 46));
             row.anchorMin = row.anchorMax = row.pivot = new Vector2(0f, 1f);
             row.anchoredPosition = new Vector2(18f, -92f);
             row.SetAsLastSibling();
@@ -149,9 +149,9 @@ namespace GameJamOcean.UI
 
         private Slot CreateSlot(string name, Sprite[] sprites)
         {
-            RectTransform root = Rect(name, row, new Vector2(88, 42));
+            RectTransform root = Rect(name, row, new Vector2(145, 42));
             root.anchorMin = root.anchorMax = root.pivot = new Vector2(0f, .5f);
-            root.gameObject.AddComponent<Image>().color = new Color(.02f, .09f, .14f, .72f);
+            root.gameObject.AddComponent<Image>().color = new Color(.02f, .09f, .14f, .12f);
             if (sprites != null)
             {
                 int count = Mathf.Max(1, sprites.Length);
@@ -165,19 +165,18 @@ namespace GameJamOcean.UI
                     image.sprite = sprites[i]; image.preserveAspect = true; image.raycastTarget = false;
                 }
             }
-            RectTransform barBack = Rect("Time", root, new Vector2(48, 7));
+            RectTransform barBack = Rect("Time", root, new Vector2(100, 8));
             barBack.anchorMin = barBack.anchorMax = barBack.pivot = new Vector2(0f, .5f);
-            barBack.anchoredPosition = new Vector2(35, -10);
-            barBack.gameObject.AddComponent<Image>().color = new Color(0f, 0f, 0f, .7f);
+            barBack.anchoredPosition = new Vector2(39, -10);
+            barBack.gameObject.AddComponent<Image>().color = new Color(0f, 0f, 0f, .12f);
             RectTransform fillRect = Rect("Remaining", barBack, Vector2.zero);
             fillRect.anchorMin = Vector2.zero; fillRect.anchorMax = Vector2.one;
             fillRect.offsetMin = fillRect.offsetMax = Vector2.zero;
-            Image fill = fillRect.gameObject.AddComponent<Image>();
-            fill.color = new Color(.2f, .9f, 1f, 1f);
-            fill.type = Image.Type.Filled; fill.fillMethod = Image.FillMethod.Horizontal;
-            fill.raycastTarget = false;
+            Image fillImage = fillRect.gameObject.AddComponent<Image>();
+            fillImage.color = new Color(.2f, .9f, 1f, 1f);
+            fillImage.raycastTarget = false;
             root.gameObject.SetActive(false);
-            return new Slot { root = root, fill = fill };
+            return new Slot { root = root, fill = fillRect };
         }
 
         private static void UpdateSlot(Slot slot, float remaining, float normalized, ref int visible)
@@ -186,8 +185,8 @@ namespace GameJamOcean.UI
             bool active = remaining > 0f;
             slot.root.gameObject.SetActive(active);
             if (!active) return;
-            slot.root.anchoredPosition = new Vector2(visible * 94f, 0f);
-            slot.fill.fillAmount = normalized;
+            slot.root.anchoredPosition = new Vector2(visible * 151f, 0f);
+            slot.fill.anchorMax = new Vector2(Mathf.Clamp01(normalized), 1f);
             visible++;
         }
 

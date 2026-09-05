@@ -14,6 +14,7 @@ namespace GameJamOcean.Progression
         [SerializeField] private UnityEvent onGameCompleted = new();
         private const string SaveKey = "GameJamOcean.Progress.v1";
         private bool purchasing;
+        private int pendingGoldDelta;
         [Serializable] private sealed class SaveData
         {
             public int gold;
@@ -29,10 +30,17 @@ namespace GameJamOcean.Progression
 
         public event Action<int> TotalGoldChanged;
         public event Action UpgradesChanged;
+        public event Action GameCompleted;
         public bool IsGameCompleted => GetLevel(UpgradeKind.Island) == 4;
         public UpgradeCatalog Catalog => upgradeCatalog;
 
         public int TotalGold => totalGold;
+        public int ConsumePendingGoldDelta()
+        {
+            int value = pendingGoldDelta;
+            pendingGoldDelta = 0;
+            return value;
+        }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void Bootstrap()
@@ -68,6 +76,7 @@ namespace GameJamOcean.Progression
             }
 
             totalGold = (int)Math.Min(int.MaxValue, (long)totalGold + amount);
+            pendingGoldDelta += amount;
             SaveProgress();
             onTotalGoldChanged?.Invoke(totalGold);
             TotalGoldChanged?.Invoke(totalGold);
@@ -81,6 +90,7 @@ namespace GameJamOcean.Progression
             }
 
             totalGold -= amount;
+            pendingGoldDelta -= amount;
             SaveProgress();
             onTotalGoldChanged?.Invoke(totalGold);
             TotalGoldChanged?.Invoke(totalGold);
@@ -90,6 +100,7 @@ namespace GameJamOcean.Progression
         public void ResetProgress()
         {
             totalGold = 0;
+            pendingGoldDelta = 0;
             upgradeLevels = new[] { 1, 1, 1, 1, 1, 1 };
             SaveProgress();
             UpgradesChanged?.Invoke();
@@ -100,7 +111,8 @@ namespace GameJamOcean.Progression
         public int GetLevel(UpgradeKind kind)
         {
             int index = (int)kind;
-            return index >= 0 && index < upgradeLevels.Length ? Mathf.Clamp(upgradeLevels[index], 1, index == 0 ? 4 : 3) : 1;
+            return index >= 0 && index < upgradeLevels.Length
+                ? Mathf.Clamp(upgradeLevels[index], 1, kind == UpgradeKind.Island || kind == UpgradeKind.Harpoon ? 4 : 3) : 1;
         }
 
         public bool TryPurchase(UpgradeKind kind, int expectedLevel, out string message)
@@ -118,13 +130,21 @@ namespace GameJamOcean.Progression
             purchasing = true;
             try
             {
+                int spent = totalGold - gold;
                 totalGold = gold;
+                pendingGoldDelta -= spent;
                 upgradeLevels[(int)kind] = level;
+                if (kind == UpgradeKind.BoatHull)
+                    upgradeLevels[(int)UpgradeKind.BoatTurbo] = level;
                 SaveProgress();
                 UpgradesChanged?.Invoke();
                 onTotalGoldChanged?.Invoke(totalGold);
                 TotalGoldChanged?.Invoke(totalGold);
-                if (kind == UpgradeKind.Island && level == 4) onGameCompleted.Invoke();
+                if (kind == UpgradeKind.Island && level == 4)
+                {
+                    onGameCompleted.Invoke();
+                    GameCompleted?.Invoke();
+                }
             }
             finally { purchasing = false; }
             return true;
@@ -148,7 +168,10 @@ namespace GameJamOcean.Progression
                 HasSavedGame = true;
                 totalGold = Mathf.Max(0, saved.gold);
                 if (saved.levels != null) for (int i = 0; i < Math.Min(6, saved.levels.Length); i++)
-                    upgradeLevels[i] = Mathf.Clamp(saved.levels[i], 1, i == 0 ? 4 : 3);
+                    upgradeLevels[i] = Mathf.Clamp(saved.levels[i], 1, i == 0 || i == (int)UpgradeKind.Harpoon ? 4 : 3);
+                int vesselLevel = Mathf.Max(upgradeLevels[(int)UpgradeKind.BoatHull], upgradeLevels[(int)UpgradeKind.BoatTurbo]);
+                upgradeLevels[(int)UpgradeKind.BoatHull] = vesselLevel;
+                upgradeLevels[(int)UpgradeKind.BoatTurbo] = vesselLevel;
             }
             catch (Exception error) { Debug.LogWarning($"Não foi possível ler o progresso: {error.Message}"); }
         }

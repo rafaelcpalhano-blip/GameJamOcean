@@ -56,6 +56,8 @@ namespace GameJamOcean.EditorTools
                     if (tier != null && tier.harpoonPrefab == null)
                         tier.harpoonPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(paths[i])?.GetComponent<HarpoonProjectile2D>();
                 }
+                if (harpoons.islandLevel4.harpoonPrefab == null)
+                    harpoons.islandLevel4.harpoonPrefab = harpoons.level3.harpoonPrefab;
             }
             EditorUtility.SetDirty(catalog);
             AssetDatabase.SaveAssets();
@@ -90,7 +92,7 @@ namespace GameJamOcean.EditorTools
             EditorSceneManager.SaveScene(scene);
             Selection.activeObject = catalog;
             EditorUtility.DisplayDialog("Upgrades",
-                "Sistema configurado! Balanceie custos e valores no UpgradeCatalog. A aldeia termina no N4; os demais no N3. Interaja com o porto para abrir o painel.", "OK");
+                "Sistema configurado! Balanceie custos e valores no UpgradeCatalog. Aldeia e arpão terminam no N4; os demais no N3. Interaja com o porto para abrir o painel.", "OK");
         }
 
         [MenuItem("Tools/GameJamOcean/Reset Saved Gold and Upgrades")]

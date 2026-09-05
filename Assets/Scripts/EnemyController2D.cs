@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using GameJamOcean.Combat;
+using GameJamOcean.Diving;
 using GameJamOcean.Player;
 using GameJamOcean.Weapons;
 using UnityEngine;
@@ -31,9 +32,16 @@ namespace GameJamOcean.Enemies
         [SerializeField, Range(0f, 3f)] private float separationStrength = 1.3f;
         [SerializeField, Range(0f, 1f)] private float weaveStrength = .55f;
         [SerializeField, Min(.1f)] private float steeringSharpness = 3f;
+        [Header("Anti-camping Aggression")]
+        [SerializeField, Min(1f)] private float massAttackDistance = 6f;
+        [SerializeField, Min(1f)] private float distantSpeedMultiplier = 1.65f;
+        [SerializeField, Range(0f, 1f)] private float finalWaveThreshold = .85f;
+        [SerializeField, Min(1f)] private float finalWaveSpeedMultiplier = 1.3f;
         private static readonly List<EnemyController2D> ActiveEnemies = new();
         private float weavePhase, weaveFrequency;
         private GameJamOcean.World.MovementBounds2D movementBounds;
+        private DiveSessionManager sessionManager;
+        private float currentAggression = 1f;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetActiveEnemies() => ActiveEnemies.Clear();
@@ -126,6 +134,7 @@ namespace GameJamOcean.Enemies
             if (speciesProfile == SpeciesProfile.PeixeEspada) movementSpeed *= 1.35f;
             if (speciesProfile == SpeciesProfile.Polvo) movementSpeed *= 1.22f;
             movementBounds = FindFirstObjectByType<GameJamOcean.World.MovementBounds2D>();
+            sessionManager = FindFirstObjectByType<DiveSessionManager>();
 
             if (animator == null)
             {
@@ -203,9 +212,12 @@ namespace GameJamOcean.Enemies
             }
 
             Vector2 separation = Vector2.zero;
+            float closestEnemyToPlayer = distance;
             foreach (var other in ActiveEnemies)
             {
                 if (other == this || other == null || other.enemyHealth.IsDead) continue;
+                closestEnemyToPlayer = Mathf.Min(closestEnemyToPlayer,
+                    Vector2.Distance(other.enemyRigidbody.position, target.position));
                 Vector2 away = enemyRigidbody.position - other.enemyRigidbody.position;
                 float gap = away.magnitude;
                 bool fellowOctopus = speciesProfile == SpeciesProfile.Polvo
@@ -244,6 +256,16 @@ namespace GameJamOcean.Enemies
             if (speciesProfile == SpeciesProfile.SereiaGuerreira)
                 ApplyWarriorMovement(distance, direction, tangent, ref pursuit, ref sideways, ref speedMultiplier);
 
+            // The rush starts only when the whole group has been left behind, not for
+            // isolated enemies that happen to be spawning at the edge of the arena.
+            float distancePressure = Mathf.InverseLerp(massAttackDistance,
+                massAttackDistance * 1.75f, closestEnemyToPlayer);
+            currentAggression = Mathf.Lerp(1f, distantSpeedMultiplier, distancePressure);
+            if (sessionManager != null && sessionManager.TotalEnemies > 0
+                && sessionManager.KilledEnemies >= Mathf.CeilToInt(sessionManager.TotalEnemies * finalWaveThreshold))
+                currentAggression *= finalWaveSpeedMultiplier;
+            speedMultiplier *= currentAggression;
+
             Vector2 desired = Vector2.ClampMagnitude(pursuit + sideways + separation + special, 1f)
                 * movementSpeed * speedMultiplier;
             float effectiveSteering = steeringSharpness;
@@ -269,7 +291,7 @@ namespace GameJamOcean.Enemies
                 return;
             }
 
-            nextAttackTime = Time.time + attackCooldown;
+            nextAttackTime = Time.time + attackCooldown / Mathf.Max(1f, currentAggression);
             PlayActionAnimation(attackStateHash, attackAnimationDuration);
             onAttack?.Invoke();
             GameJamOcean.Audio.GameAudio.Instance?.PlayEffect(attackSound);
@@ -437,8 +459,15 @@ namespace GameJamOcean.Enemies
             }
             else if (Time.time < warriorSpecialUntil)
             {
-                pursuit = direction * -.25f + tangent * warriorOrbitSide;
-                speedMultiplier = 1.65f;
+                // Keep pressuring the diver between charges instead of waiting at orbit range.
+                pursuit = direction * .55f + tangent * warriorOrbitSide * .45f;
+                speedMultiplier = 1.35f;
+            }
+            else
+            {
+                pursuit = distance > attackRange * .85f ? direction : Vector2.zero;
+                sideways *= .25f;
+                speedMultiplier = 1.1f;
             }
         }
 
@@ -547,16 +576,39 @@ namespace GameJamOcean.Enemies
         private void HandleDeath(Health health, GameObject source)
         {
             enemyRigidbody.linearVelocity = Vector2.zero;
-            deathAnimationPlaying = true;
+            bool hasDeathAnimation = animator != null && deathStateHash != 0 && animator.HasState(0, deathStateHash);
+            deathAnimationPlaying = hasDeathAnimation;
             animationLockedUntil = float.PositiveInfinity;
-            ChangeAnimation(deathStateHash, transitionDuration, true);
+            if (hasDeathAnimation) ChangeAnimation(deathStateHash, transitionDuration, true);
             onEnemyDied?.Invoke();
             EnemyDied?.Invoke(this);
 
             if (destroyOnDeath)
             {
-                Destroy(gameObject, destroyDelay);
+                if (hasDeathAnimation) Destroy(gameObject, destroyDelay);
+                else StartCoroutine(FadeDeath(Mathf.Max(.3f, destroyDelay)));
             }
+        }
+
+        private IEnumerator FadeDeath(float duration)
+        {
+            Collider2D[] colliders = GetComponentsInChildren<Collider2D>();
+            foreach (Collider2D item in colliders) item.enabled = false;
+            SpriteRenderer[] renderers = GetComponentsInChildren<SpriteRenderer>();
+            Color[] colors = new Color[renderers.Length];
+            for (int i = 0; i < renderers.Length; i++) colors[i] = renderers[i].color;
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float alpha = 1f - Mathf.Clamp01(elapsed / duration);
+                for (int i = 0; i < renderers.Length; i++)
+                {
+                    Color color = colors[i]; color.a *= alpha; renderers[i].color = color;
+                }
+                yield return null;
+            }
+            Destroy(gameObject);
         }
 
         private void ConfigureRigidbody()

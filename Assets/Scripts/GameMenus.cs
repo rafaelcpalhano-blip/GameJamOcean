@@ -25,7 +25,8 @@ namespace GameJamOcean.UI
         private static GameMenus instance;
         private static int resumeFrame = -1;
         public static bool BoatRecoveryActive { get; set; }
-        public static bool BlocksGameplay => BoatRecoveryActive || Time.timeScale <= 0f || (instance != null && instance.open) || Time.frameCount == resumeFrame;
+        public static bool EndGameActive { get; set; }
+        public static bool BlocksGameplay => BoatRecoveryActive || EndGameActive || Time.timeScale <= 0f || (instance != null && instance.open) || Time.frameCount == resumeFrame;
         public static float SteeringMultiplier { get; private set; } = 1f;
         private bool firstScene = true, requestMain, main, open, loading;
         private bool requestIntro, transitioning;
@@ -55,7 +56,7 @@ namespace GameJamOcean.UI
         private Vector3 boatVelocity, boatAngularVelocity;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() { instance = null; resumeFrame = -1; SteeringMultiplier = 1f; BoatRecoveryActive = false; }
+        private static void ResetStatics() { instance = null; resumeFrame = -1; SteeringMultiplier = 1f; BoatRecoveryActive = false; EndGameActive = false; }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void Bootstrap()
@@ -92,6 +93,9 @@ namespace GameJamOcean.UI
             if (scene.name == Ocean) GameJamOcean.World.OceanRockSetup.Configure(scene);
             if (scene.name == Ocean) GameJamOcean.World.SharkFinPatrol3D.ConfigureScene(scene);
             if (scene.name == Ocean) GameJamOcean.World.WindVfxEnhancer3D.ConfigureScene(scene);
+            if (scene.name == Ocean) OceanGoldHUD.Ensure();
+            if (scene.name == Ocean) GameJamOcean.Boat.BoatVisualUpgrade3D.ConfigureScene(scene);
+            if (scene.name == Ocean) GameJamOcean.World.LighthouseEndGameLight3D.ConfigureScene(scene);
             loading = false;
             bool showMain = scene.name == Ocean && (firstScene || requestMain);
             firstScene = false;

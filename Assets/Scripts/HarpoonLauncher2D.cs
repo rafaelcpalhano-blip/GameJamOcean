@@ -25,6 +25,7 @@ namespace GameJamOcean.Weapons
         [SerializeField, Min(0f)] private float additionalShotDelay = 0.25f;
         [SerializeField, Min(0f)] private float fallbackSpawnDistance = 0.35f;
         [SerializeField] private LayerMask blockedPointerLayers;
+        [SerializeField, Min(1)] private int baseProjectileCount = 1;
 
         private bool enabledAttackAction;
         private float nextFireTime;
@@ -91,6 +92,8 @@ namespace GameJamOcean.Weapons
             if (prefab != null) harpoonPrefab = prefab;
         }
 
+        public void SetBaseProjectileCount(int count) => baseProjectileCount = Mathf.Clamp(count, 1, 2);
+
         private void TryFire()
         {
             if (GameJamOcean.UI.GameMenus.BlocksGameplay) return;
@@ -125,10 +128,12 @@ namespace GameJamOcean.Weapons
                 ? origin
                 : origin + direction * fallbackSpawnDistance;
 
-            if (Time.time < doubleShotUntil)
+            int projectileCount = baseProjectileCount * (Time.time < doubleShotUntil ? 2 : 1);
+            if (projectileCount > 1)
             {
-                LaunchHarpoon(Rotate(direction, -doubleShotAngle * .5f), spawnPosition);
-                LaunchHarpoon(Rotate(direction, doubleShotAngle * .5f), spawnPosition);
+                float startAngle = -doubleShotAngle * (projectileCount - 1) * .5f;
+                for (int i = 0; i < projectileCount; i++)
+                    LaunchHarpoon(Rotate(direction, startAngle + doubleShotAngle * i), spawnPosition);
             }
             else LaunchHarpoon(direction, spawnPosition);
             GameJamOcean.Audio.GameAudio.Instance?.PlayHarpoon();
@@ -155,6 +160,7 @@ namespace GameJamOcean.Weapons
         {
             fireCooldown = Mathf.Max(0.01f, fireCooldown);
             fallbackSpawnDistance = Mathf.Max(0f, fallbackSpawnDistance);
+            baseProjectileCount = Mathf.Clamp(baseProjectileCount, 1, 2);
         }
     }
 }

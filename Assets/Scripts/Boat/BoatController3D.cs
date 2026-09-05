@@ -51,6 +51,8 @@ namespace GameJamOcean.Boat
         private InputAction activeTurboAction;
         private InputAction fallbackTurboAction;
         private float lastTurboUseTime = float.NegativeInfinity;
+        private Vector3 lastDrivenVelocity;
+        private Quaternion lastDrivenRotation;
 
         public float MaximumSpeed => maximumSpeed;
         public Vector3 DockPosition { get; private set; }
@@ -87,6 +89,8 @@ namespace GameJamOcean.Boat
             ConfigureRigidbody();
             currentTurboCharge = turboCapacity;
             OceanReturnState3D.TryRestore(transform, boatRigidbody);
+            lastDrivenVelocity = boatRigidbody.linearVelocity;
+            lastDrivenRotation = boatRigidbody.rotation;
         }
 
         private void OnEnable()
@@ -222,7 +226,19 @@ namespace GameJamOcean.Boat
             float reverseDirection = forwardSpeed < -0.05f ? -1f : 1f;
             float yawStep = smoothedSteering * rotationSpeed * GameJamOcean.UI.GameMenus.SteeringMultiplier * steeringAuthority
                 * reverseDirection * deltaTime;
-            boatRigidbody.MoveRotation(boatRigidbody.rotation * Quaternion.Euler(0f, yawStep, 0f));
+            Quaternion drivenRotation = boatRigidbody.rotation * Quaternion.Euler(0f, yawStep, 0f);
+            boatRigidbody.MoveRotation(drivenRotation);
+            lastDrivenVelocity = boatRigidbody.linearVelocity;
+            lastDrivenRotation = drivenRotation;
+        }
+
+        public void RejectCollisionRecoil()
+        {
+            if (boatRigidbody == null || boatRigidbody.isKinematic) return;
+            float vertical = boatRigidbody.linearVelocity.y;
+            boatRigidbody.linearVelocity = new Vector3(lastDrivenVelocity.x, vertical, lastDrivenVelocity.z);
+            boatRigidbody.angularVelocity = Vector3.zero;
+            boatRigidbody.MoveRotation(lastDrivenRotation);
         }
 
         public void ConfigureInput(

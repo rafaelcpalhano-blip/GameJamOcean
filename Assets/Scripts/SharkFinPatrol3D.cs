@@ -251,6 +251,15 @@ namespace GameJamOcean.World
             var body = boat.GetComponent<Rigidbody>();
             Vector3 push = body != null ? Flat(body.position - sharkBody.position).normalized : direction;
             if (push.sqrMagnitude < .001f) push = direction;
+            bool cargoBoat = GameJamOcean.Progression.GameProgress.HasInstance
+                && GameJamOcean.Progression.GameProgress.Instance.GetLevel(
+                    GameJamOcean.Progression.UpgradeKind.BoatHull) >= 3;
+            if (cargoBoat)
+            {
+                boat.RejectCollisionRecoil();
+                sharkBody.AddForce(-push * Mathf.Max(4.5f, impactPushSpeed * 3f), ForceMode.VelocityChange);
+                return;
+            }
             FindFirstObjectByType<GameJamOcean.CameraSystem.CameraFollow3D>()
                 ?.PlayCollisionImpact(push);
             boat.GetComponent<BoatWaterMotion3D>()?.PlayCollisionImpact(push);
