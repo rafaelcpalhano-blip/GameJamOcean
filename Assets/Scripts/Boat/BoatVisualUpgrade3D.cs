@@ -13,22 +13,19 @@ namespace GameJamOcean.Boat
         public static void ConfigureScene(Scene scene)
         {
             BoatController3D boat = null;
-            GameObject boat2 = null, boat3 = null;
             foreach (GameObject root in scene.GetRootGameObjects())
             {
                 boat ??= root.GetComponentInChildren<BoatController3D>(true);
-                if (root.name.Equals("boat2", System.StringComparison.OrdinalIgnoreCase)) boat2 = root;
-                if (root.name.Equals("boat3", System.StringComparison.OrdinalIgnoreCase)) boat3 = root;
             }
             if (boat == null || boat.GetComponent<BoatVisualUpgrade3D>() != null) return;
-            Transform boat1 = FindChild(boat.transform, "boat-speed-b");
-            if (boat1 == null || boat2 == null || boat3 == null)
+            BoatVisualUpgradeSettings settings = Resources.Load<BoatVisualUpgradeSettings>("BoatVisualUpgradeSettings");
+            if (settings == null || !settings.IsValid)
             {
-                Debug.LogWarning("Boat visual upgrades need boat-speed-b, boat2 and boat3 in OceanScene_3D.");
+                Debug.LogError("BoatVisualUpgradeSettings is missing its boat1, boat2 or boat3 prefab reference.");
                 return;
             }
             var component = boat.gameObject.AddComponent<BoatVisualUpgrade3D>();
-            component.Setup(boat1.gameObject, boat2, boat3);
+            component.Setup(settings.Prefabs, scene);
         }
 
         private static Transform FindChild(Transform root, string name)
@@ -38,13 +35,24 @@ namespace GameJamOcean.Boat
             return null;
         }
 
-        private void Setup(GameObject boat1, GameObject boat2, GameObject boat3)
+        private void Setup(GameObject[] prefabs, Scene scene)
         {
+            // Hide legacy scene instances while they still exist. They can now be safely deleted.
+            Transform legacyBoat1 = FindChild(transform, "boat-speed-b") ?? FindChild(transform, "boat1");
+            if (legacyBoat1 != null) legacyBoat1.gameObject.SetActive(false);
+            foreach (GameObject root in scene.GetRootGameObjects())
+                if (root.name.Equals("boat2", System.StringComparison.OrdinalIgnoreCase)
+                    || root.name.Equals("boat3", System.StringComparison.OrdinalIgnoreCase))
+                    root.SetActive(false);
+
             var holder = new GameObject("Boat Visual Variants").transform;
             holder.SetParent(transform, false);
-            holder.SetPositionAndRotation(boat1.transform.position, boat1.transform.rotation);
-            holder.localScale = boat1.transform.lossyScale;
-            variants = new[] { boat1, boat2, boat3 };
+            holder.localPosition = Vector3.zero;
+            holder.localRotation = Quaternion.identity;
+            holder.localScale = Vector3.one;
+            variants = new GameObject[prefabs.Length];
+            for (int i = 0; i < prefabs.Length; i++)
+                variants[i] = Instantiate(prefabs[i], holder);
             for (int i = 0; i < variants.Length; i++)
             {
                 GameObject variant = variants[i];
@@ -56,7 +64,12 @@ namespace GameJamOcean.Boat
                 foreach (Collider collider in variant.GetComponentsInChildren<Collider>(true)) Destroy(collider);
                 foreach (Rigidbody body in variant.GetComponentsInChildren<Rigidbody>(true)) Destroy(body);
             }
-            GetComponent<BoatWaterMotion3D>()?.Configure(holder);
+            BoatWaterMotion3D waterMotion = GetComponent<BoatWaterMotion3D>();
+            if (waterMotion != null)
+            {
+                waterMotion.Configure(holder);
+                waterMotion.enabled = true;
+            }
             if (GameProgress.HasInstance) GameProgress.Instance.UpgradesChanged += Refresh;
             Refresh();
         }
