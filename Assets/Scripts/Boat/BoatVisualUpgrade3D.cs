@@ -8,6 +8,9 @@ namespace GameJamOcean.Boat
     public sealed class BoatVisualUpgrade3D : MonoBehaviour
     {
         private GameObject[] variants;
+        private BoxCollider physicalCollider;
+        private Vector3 originalColliderCenter;
+        private Vector3 originalColliderSize;
         public int CurrentVesselLevel { get; private set; } = 1;
 
         public static void ConfigureScene(Scene scene)
@@ -37,6 +40,12 @@ namespace GameJamOcean.Boat
 
         private void Setup(GameObject[] prefabs, Scene scene)
         {
+            physicalCollider = GetComponent<BoxCollider>();
+            if (physicalCollider != null)
+            {
+                originalColliderCenter = physicalCollider.center;
+                originalColliderSize = physicalCollider.size;
+            }
             // Hide legacy scene instances while they still exist. They can now be safely deleted.
             Transform legacyBoat1 = FindChild(transform, "boat-speed-b") ?? FindChild(transform, "boat1");
             if (legacyBoat1 != null) legacyBoat1.gameObject.SetActive(false);
@@ -80,6 +89,34 @@ namespace GameJamOcean.Boat
             int level = GameProgress.HasInstance ? GameProgress.Instance.GetLevel(UpgradeKind.BoatHull) : 1;
             CurrentVesselLevel = Mathf.Clamp(level, 1, variants.Length);
             for (int i = 0; i < variants.Length; i++) if (variants[i] != null) variants[i].SetActive(i == Mathf.Clamp(level - 1, 0, variants.Length - 1));
+            RefreshPhysicalCollider();
+        }
+
+        public float RockDamagePercent => CurrentVesselLevel switch { 2 => 35f, 3 => 25f, _ => 40f };
+        public float SharkDamagePercent => CurrentVesselLevel switch { 2 => 25f, 3 => 15f, _ => 30f };
+
+        private void RefreshPhysicalCollider()
+        {
+            if (physicalCollider == null) return;
+            if (CurrentVesselLevel != 3 || variants == null || variants.Length < 3 || variants[2] == null)
+            {
+                physicalCollider.center = originalColliderCenter;
+                physicalCollider.size = originalColliderSize;
+                return;
+            }
+            Renderer[] renderers = variants[2].GetComponentsInChildren<Renderer>(false);
+            if (renderers.Length == 0) return;
+            Bounds local = new(transform.InverseTransformPoint(renderers[0].bounds.center), Vector3.zero);
+            foreach (Renderer renderer in renderers)
+            {
+                Bounds bounds = renderer.bounds;
+                for (int corner = 0; corner < 8; corner++)
+                    local.Encapsulate(transform.InverseTransformPoint(bounds.center + Vector3.Scale(bounds.extents,
+                        new Vector3((corner & 1) == 0 ? -1 : 1, (corner & 2) == 0 ? -1 : 1,
+                            (corner & 4) == 0 ? -1 : 1))));
+            }
+            physicalCollider.center = new Vector3(local.center.x, originalColliderCenter.y, local.center.z);
+            physicalCollider.size = new Vector3(local.size.x, originalColliderSize.y, local.size.z);
         }
 
         private void OnDestroy()

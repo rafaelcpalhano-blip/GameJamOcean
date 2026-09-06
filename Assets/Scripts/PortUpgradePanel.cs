@@ -11,6 +11,7 @@ namespace GameJamOcean.Progression
     public sealed class PortUpgradePanel : MonoBehaviour
     {
         [Header("Village versions — never parent these under one another")]
+        [SerializeField] private GameObject villageLevel0;
         [SerializeField] private GameObject villageLevel1;
         [SerializeField] private GameObject villageLevel2;
         [SerializeField] private GameObject villageLevel3;
@@ -59,6 +60,7 @@ namespace GameJamOcean.Progression
         private readonly Button[] buttons = new Button[5];
         private readonly TMP_Text[] labels = new TMP_Text[5];
         private readonly TMP_Text[] prices = new TMP_Text[5];
+        private readonly GameObject[] rows = new GameObject[5];
         private readonly int[] offeredLevels = new int[5];
         private bool isOpen;
         private bool wasMoving;
@@ -68,6 +70,7 @@ namespace GameJamOcean.Progression
         private bool previousCursorVisible;
         private float nextPurchaseTime;
         private GameProgress progress;
+        private bool firstPierGoldHintShown;
 
         public void Configure(GameObject first, GameObject second, GameObject third, GameObject fourth, BoatController3D targetBoat)
         {
@@ -79,6 +82,9 @@ namespace GameJamOcean.Progression
 
         private void Start()
         {
+            if (villageLevel0 == null)
+                foreach (Transform candidate in FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                    if (candidate.name == "AldeiaNV0") { villageLevel0 = candidate.gameObject; break; }
             progress = GameProgress.Instance;
             if (progress == null) return;
             BuildPanel();
@@ -121,6 +127,11 @@ namespace GameJamOcean.Progression
             modal.SetActive(true);
             statusLabel.text = progress.IsGameCompleted ? "Aldeia N4 — jogo concluído!" : "Escolha um upgrade. Todos os preços são em ouro.";
             Refresh();
+            if (!firstPierGoldHintShown && progress.GetLevel(UpgradeKind.Island) == 0)
+            {
+                firstPierGoldHintShown = true;
+                GameJamOcean.UI.OceanGoldHUD.FlashAvailableGold();
+            }
         }
 
         public void Close()
@@ -151,11 +162,13 @@ namespace GameJamOcean.Progression
         private void OnProgressChanged()
         {
             int level = progress.GetLevel(UpgradeKind.Island);
-            GameObject chosen = level == 1 ? villageLevel1 : level == 2 ? villageLevel2 : level == 3 ? villageLevel3 : villageLevel4;
+            GameObject chosen = level == 0 ? villageLevel0 : level == 1 ? villageLevel1
+                : level == 2 ? villageLevel2 : level == 3 ? villageLevel3 : villageLevel4;
             if (chosen != null)
             {
                 // Enable the new village FIRST, then remove the previous visuals.
                 chosen.SetActive(true);
+                if (villageLevel0 != null && villageLevel0 != chosen) villageLevel0.SetActive(false);
                 if (villageLevel1 != null && villageLevel1 != chosen) villageLevel1.SetActive(false);
                 if (villageLevel2 != null && villageLevel2 != chosen) villageLevel2.SetActive(false);
                 if (villageLevel3 != null && villageLevel3 != chosen) villageLevel3.SetActive(false);
@@ -173,8 +186,10 @@ namespace GameJamOcean.Progression
             { statusLabel.text = "Configure as quatro versões da aldeia antes de comprar."; return; }
             UpgradeKind kind = VisibleUpgrades[index];
             bool completedBefore = progress.IsGameCompleted;
-            progress.TryPurchase(kind, offeredLevels[index], out string message);
-            statusLabel.text = progress.IsGameCompleted ? "Aldeia N4 — jogo concluído!" : message;
+            bool purchased = progress.TryPurchase(kind, offeredLevels[index], out string message);
+            statusLabel.text = purchased && kind == UpgradeKind.Island && offeredLevels[index] == 0
+                ? "Para proteger este lugar das grandes embarcações, ainda precisaremos evoluir bastante. Nosso objetivo é fazer o farol voltar a brilhar. Será um caminho árduo, mas recompensador."
+                : progress.IsGameCompleted ? "Aldeia N4 — jogo concluído!" : message;
             Refresh();
             if (!completedBefore && progress.IsGameCompleted)
             {
@@ -197,8 +212,11 @@ namespace GameJamOcean.Progression
             }
             string error = "Catálogo ausente. Execute Configure Upgrade System.";
             bool valid = progress.Catalog != null && progress.Catalog.Validate(out error);
+            bool firstPierUpgrade = progress.GetLevel(UpgradeKind.Island) == 0;
             for (int i = 0; i < VisibleUpgrades.Length; i++)
             {
+                if (rows[i] != null) rows[i].SetActive(!firstPierUpgrade || i == 0);
+                if (firstPierUpgrade && i != 0) continue;
                 UpgradeKind kind = VisibleUpgrades[i];
                 int level = progress.GetLevel(kind);
                 offeredLevels[i] = level;
@@ -212,12 +230,15 @@ namespace GameJamOcean.Progression
                 }
                 bool maximum = level >= definition.MaximumLevel;
                 var next = definition.Tier(Mathf.Min(definition.MaximumLevel, level + 1));
-                labels[i].text = $"{definition.displayName}  |  N{level}" +
+                labels[i].text = firstPierUpgrade && kind == UpgradeKind.Island
+                    ? "PIER\nO primeiro passo para melhorar o comércio marítimo; o próximo será nosso farol!"
+                    : $"{definition.displayName}  |  N{level}" +
                     (maximum ? "\nNível máximo" : $"\nN{level + 1}: {Describe(definition.kind, next, level + 1)}");
                 prices[i].text = maximum ? "MÁXIMO" : $"{next.goldCost} OURO\nCOMPRAR";
                 buttons[i].interactable = !maximum && progress.TotalGold >= next.goldCost;
                 if (kind == UpgradeKind.Island && (villageLevel1 == null || villageLevel2 == null || villageLevel3 == null || villageLevel4 == null)) buttons[i].interactable = false;
             }
+            if (repairButton != null) repairButton.gameObject.SetActive(!firstPierUpgrade);
             if (!valid) statusLabel.text = error;
         }
 
@@ -261,6 +282,7 @@ namespace GameJamOcean.Progression
             for (int i = 0; i < VisibleUpgrades.Length; i++)
             {
                 RectTransform row = Rect($"Upgrade {i}", panel, new Vector2(830, 65), new Vector2(0, -130 - i * 75));
+                rows[i] = row.gameObject;
                 row.gameObject.AddComponent<Image>().color = new Color(0.06f, 0.19f, 0.23f, 1);
                 labels[i] = Label("Description", row, new Vector2(600, 60), new Vector2(-105, -2), "", 20);
                 labels[i].alignment = TextAlignmentOptions.MidlineLeft;

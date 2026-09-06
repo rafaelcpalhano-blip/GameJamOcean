@@ -23,10 +23,10 @@ namespace GameJamOcean.World
         [SerializeField, Min(1f)] private float pursuitRadius = 12f;
         [SerializeField, Min(1f)] private float chargeTurnSpeed = 90f;
         [SerializeField, Min(.1f)] private float chargeSpeed = 6f;
-        [SerializeField, Min(.1f)] private float chargeDuration = 4f;
+        [SerializeField, Min(.1f)] private float chargeDuration = 5f;
         [SerializeField, Min(0f)] private float impactPushSpeed = 1.5f;
         [SerializeField, Min(.1f)] private float attackCooldown = 6f;
-        [SerializeField, Range(0, 100)] private float damagePercent = 20f;
+        [SerializeField, Range(0, 100)] private float damagePercent = 30f;
         private Vector3 home, direction, destination;
         private Quaternion initialRotation;
         private float depth, desiredDepth, nextDive, nextAttack, chargeUntil;
@@ -247,7 +247,9 @@ namespace GameJamOcean.World
             nextAttack = Time.time + attackCooldown;
             nextContactDamageTime = Time.time + attackCooldown;
             ChoosePoint();
-            health.TakeDamage(health.MaximumHealth * damagePercent / 100f, gameObject);
+            BoatVisualUpgrade3D visual = boat.GetComponent<BoatVisualUpgrade3D>();
+            float appliedDamagePercent = visual != null ? visual.SharkDamagePercent : damagePercent;
+            health.TakeDamage(health.MaximumHealth * appliedDamagePercent / 100f, gameObject);
             var body = boat.GetComponent<Rigidbody>();
             Vector3 push = body != null ? Flat(body.position - sharkBody.position).normalized : direction;
             if (push.sqrMagnitude < .001f) push = direction;

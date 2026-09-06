@@ -45,6 +45,8 @@ namespace GameJamOcean.Boat
         [SerializeField, Min(.5f)] private float sinkingDuration = 3.5f;
         [SerializeField, Min(1f)] private float sinkingDepth = 5f;
         [SerializeField, Range(0f, 40f)] private float sinkingRoll = 22f;
+        [Tooltip("Custo cobrado da segunda destruição do barco em diante.")]
+        [SerializeField, Min(0)] private int destructionGoldCost = 200;
         private bool sinking;
 
         public Health Health => health;
@@ -195,6 +197,10 @@ namespace GameJamOcean.Boat
         {
             sinking = true;
             GameJamOcean.UI.GameMenus.BoatRecoveryActive = true;
+            bool firstDeathFree = true;
+            int chargedGold = 0;
+            if (GameProgress.HasInstance)
+                GameProgress.Instance.RegisterBoatDestruction(destructionGoldCost, out firstDeathFree, out chargedGold);
             var body = GetComponent<Rigidbody>();
             bool wasKinematic = body.isKinematic;
             // Do not interpolate from underwater poses across the rescue teleport/pause.
@@ -235,7 +241,7 @@ namespace GameJamOcean.Boat
             var camera = FindFirstObjectByType<GameJamOcean.CameraSystem.CameraFollow3D>();
             if (camera != null) camera.ShowRescueView();
             sinking = false;
-            GameJamOcean.UI.GameMenus.ShowRescueLetter();
+            GameJamOcean.UI.GameMenus.ShowRescueLetter(firstDeathFree, chargedGold, destructionGoldCost);
             // The letter and camera transition pause physics. Keep the exact dock pose
             // visible until simulation has resumed and has fresh interpolation samples.
             yield return new WaitForFixedUpdate();

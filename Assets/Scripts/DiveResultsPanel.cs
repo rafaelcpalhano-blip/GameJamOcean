@@ -27,25 +27,30 @@ namespace GameJamOcean.Flow
             Text(panel, "Title", new Vector2(560, 50), new Vector2(0, -25), won ? "MERGULHO CONCLUÍDO!" : "FIM DO MERGULHO", 30, Color.white);
             Text(panel, "Progress", new Vector2(560, 35), new Vector2(0, -80),
                 $"Inimigos derrotados: {session.KilledEnemies}/{session.TotalEnemies}", 21, Color.white);
-            float y = -140;
-            if (session.OpenedSmallChests > 0)
-            {
-                Row(panel, session.SmallChestIcon, $"Baús pequenos ×{session.OpenedSmallChests}", session.SecuredGold, y);
-                y -= 70;
-            }
-            if (won)
-            {
-                Row(panel, session.FinalChestIcon, "Baú final ×1", session.FinalRewardGold, y);
-                y -= 70;
-            }
-            if (session.CollectedCoinGold > 0)
-                Row(panel, coin, "Moedas coletadas", session.CollectedCoinGold, y);
-            Text(panel, "Total", new Vector2(560, 45), new Vector2(0, -365), $"TOTAL RECEBIDO: {total} OURO", 28, new Color(1, 0.85f, 0.1f));
+            Row(panel, session.SmallChestIcon, $"Baú P ×{session.OpenedSmallChests}", session.SecuredGold, -140);
+            Row(panel, session.FinalChestIcon, won ? "Baú G ×1" : "Baú G ×0", session.FinalRewardGold, -210);
+            Row(panel, coin, "Moedas soltas", session.CollectedCoinGold, -280);
+            TMP_Text totalLabel = Text(panel, "Total", new Vector2(560, 45), new Vector2(0, -365),
+                "TOTAL RECEBIDO: 0 OURO", 28, new Color(1, 0.85f, 0.1f));
+            StartCoroutine(AnimateTotal(totalLabel, total));
             var buttonRect = Rect("Return", panel, new Vector2(360, 55), new Vector2(0, -445));
             var image = buttonRect.gameObject.AddComponent<Image>(); image.color = new Color(0.12f, 0.45f, 0.5f);
             var button = buttonRect.gameObject.AddComponent<Button>(); button.targetGraphic = image;
             Text(buttonRect, "Label", new Vector2(350, 50), Vector2.zero, "VOLTAR AO OCEANO", 23, Color.white);
             button.onClick.AddListener(() => onContinue());
+        }
+
+        private static System.Collections.IEnumerator AnimateTotal(TMP_Text label, int total)
+        {
+            total = Mathf.Max(0, total);
+            if (total == 0) yield break;
+            float stepDelay = 4f / total;
+            for (int value = 1; value <= total; value++)
+            {
+                if (label == null) yield break;
+                label.text = $"TOTAL RECEBIDO: {value} OURO";
+                yield return new WaitForSecondsRealtime(stepDelay);
+            }
         }
 
         private static void Row(Transform parent, Sprite icon, string description, int gold, float y)

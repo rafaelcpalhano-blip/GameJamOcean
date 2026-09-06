@@ -10,15 +10,18 @@ namespace GameJamOcean.Progression
         [Header("Runtime Progress")]
         [SerializeField, Min(0)] private int totalGold;
         [SerializeField] private UpgradeCatalog upgradeCatalog;
-        [SerializeField] private int[] upgradeLevels = { 1, 1, 1, 1, 1, 1 };
+        [SerializeField] private int[] upgradeLevels = { 0, 1, 1, 1, 1, 1 };
+        [SerializeField, Min(0)] private int boatDestructions;
         [SerializeField] private UnityEvent onGameCompleted = new();
         private const string SaveKey = "GameJamOcean.Progress.v1";
+        private const int NewGameGold = 100;
         private bool purchasing;
         private int pendingGoldDelta;
         [Serializable] private sealed class SaveData
         {
             public int gold;
             public int[] levels;
+            public int boatDeaths;
         }
 
         [Header("Events")]
@@ -99,9 +102,10 @@ namespace GameJamOcean.Progression
 
         public void ResetProgress()
         {
-            totalGold = 0;
+            totalGold = NewGameGold;
             pendingGoldDelta = 0;
-            upgradeLevels = new[] { 1, 1, 1, 1, 1, 1 };
+            upgradeLevels = new[] { 0, 1, 1, 1, 1, 1 };
+            boatDestructions = 0;
             SaveProgress();
             UpgradesChanged?.Invoke();
             onTotalGoldChanged?.Invoke(totalGold);
@@ -112,7 +116,23 @@ namespace GameJamOcean.Progression
         {
             int index = (int)kind;
             return index >= 0 && index < upgradeLevels.Length
-                ? Mathf.Clamp(upgradeLevels[index], 1, kind == UpgradeKind.Island || kind == UpgradeKind.Harpoon ? 4 : 3) : 1;
+                ? Mathf.Clamp(upgradeLevels[index], kind == UpgradeKind.Island ? 0 : 1,
+                    kind == UpgradeKind.Island || kind == UpgradeKind.Harpoon ? 4 : 3) : 1;
+        }
+
+        public void RegisterBoatDestruction(int cost, out bool firstDeathFree, out int chargedGold)
+        {
+            firstDeathFree = boatDestructions == 0;
+            boatDestructions++;
+            chargedGold = firstDeathFree ? 0 : Mathf.Min(totalGold, Mathf.Max(0, cost));
+            if (chargedGold > 0)
+            {
+                totalGold -= chargedGold;
+                pendingGoldDelta -= chargedGold;
+                onTotalGoldChanged?.Invoke(totalGold);
+                TotalGoldChanged?.Invoke(totalGold);
+            }
+            SaveProgress();
         }
 
         public bool TryPurchase(UpgradeKind kind, int expectedLevel, out string message)
@@ -153,22 +173,25 @@ namespace GameJamOcean.Progression
         public void SaveProgress()
         {
             HasSavedGame = true;
-            PlayerPrefs.SetString(SaveKey, JsonUtility.ToJson(new SaveData { gold = totalGold, levels = upgradeLevels }));
+            PlayerPrefs.SetString(SaveKey, JsonUtility.ToJson(new SaveData
+                { gold = totalGold, levels = upgradeLevels, boatDeaths = boatDestructions }));
             PlayerPrefs.Save();
         }
 
         private void LoadProgress()
         {
-            upgradeLevels = new[] { 1, 1, 1, 1, 1, 1 };
-            if (!PlayerPrefs.HasKey(SaveKey)) return;
+            upgradeLevels = new[] { 0, 1, 1, 1, 1, 1 };
+            if (!PlayerPrefs.HasKey(SaveKey)) { totalGold = NewGameGold; return; }
             try
             {
                 SaveData saved = JsonUtility.FromJson<SaveData>(PlayerPrefs.GetString(SaveKey));
                 if (saved == null) return;
                 HasSavedGame = true;
                 totalGold = Mathf.Max(0, saved.gold);
+                boatDestructions = Mathf.Max(0, saved.boatDeaths);
                 if (saved.levels != null) for (int i = 0; i < Math.Min(6, saved.levels.Length); i++)
-                    upgradeLevels[i] = Mathf.Clamp(saved.levels[i], 1, i == 0 || i == (int)UpgradeKind.Harpoon ? 4 : 3);
+                    upgradeLevels[i] = Mathf.Clamp(saved.levels[i], i == 0 ? 0 : 1,
+                        i == 0 || i == (int)UpgradeKind.Harpoon ? 4 : 3);
                 int vesselLevel = Mathf.Max(upgradeLevels[(int)UpgradeKind.BoatHull], upgradeLevels[(int)UpgradeKind.BoatTurbo]);
                 upgradeLevels[(int)UpgradeKind.BoatHull] = vesselLevel;
                 upgradeLevels[(int)UpgradeKind.BoatTurbo] = vesselLevel;

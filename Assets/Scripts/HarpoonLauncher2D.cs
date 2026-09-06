@@ -78,8 +78,8 @@ namespace GameJamOcean.Weapons
         private void Update()
         {
             bool pressed = attackAction != null
-                ? attackAction.action.WasPressedThisFrame()
-                : Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
+                ? attackAction.action.IsPressed()
+                : Mouse.current != null && Mouse.current.leftButton.isPressed;
 
             if (pressed)
             {

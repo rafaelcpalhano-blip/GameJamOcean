@@ -16,7 +16,7 @@ MonoBehaviour:
   - kind: 0
     displayName: Ilha / Aldeia
     level1:
-      goldCost: 0
+      goldCost: 100
       value: 0
       harpoonPrefab: {fileID: 0}
     level2:

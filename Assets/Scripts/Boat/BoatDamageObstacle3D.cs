@@ -46,7 +46,13 @@ namespace GameJamOcean.Boat
             }
 
             clock.nextAllowedDamageTime = Time.time + damageCooldown;
-            boatHealth.TakeDamage(percentageOfMaximumHealth ? boatHealth.MaximumHealth * damage / 100f : damage, gameObject);
+            float appliedDamage = damage;
+            if (percentageOfMaximumHealth)
+            {
+                BoatVisualUpgrade3D visual = boat.GetComponent<BoatVisualUpgrade3D>();
+                appliedDamage = boatHealth.MaximumHealth * (visual != null ? visual.RockDamagePercent : 40f) / 100f;
+            }
+            boatHealth.TakeDamage(appliedDamage, gameObject);
             Vector3 push = boat.transform.position - transform.position;
             push.y = 0f;
             if (push.sqrMagnitude < .001f) push = -boat.NavigationForward;

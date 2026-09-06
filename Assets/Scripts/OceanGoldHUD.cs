@@ -15,6 +15,17 @@ namespace GameJamOcean.UI
         private SpriteRenderer goldSpinDriver;
         private Coroutine deltaAnimation;
         private GameProgress progress;
+        private Coroutine flashAnimation;
+        private static OceanGoldHUD instance;
+
+        public static void FlashAvailableGold()
+        {
+            if (instance != null && instance.totalLabel != null)
+            {
+                if (instance.flashAnimation != null) instance.StopCoroutine(instance.flashAnimation);
+                instance.flashAnimation = instance.StartCoroutine(instance.FlashGold());
+            }
+        }
 
         public static void Ensure()
         {
@@ -24,6 +35,7 @@ namespace GameJamOcean.UI
 
         private void Awake()
         {
+            instance = this;
             Build();
             progress = GameProgress.Instance;
             if (progress == null) return;
@@ -31,6 +43,19 @@ namespace GameJamOcean.UI
             int pending = progress.ConsumePendingGoldDelta();
             if (pending != 0) ShowDelta(pending, progress.TotalGold);
             else totalLabel.text = progress.TotalGold.ToString();
+        }
+
+        private IEnumerator FlashGold()
+        {
+            Color normal = Color.white;
+            for (int i = 0; i < 3; i++)
+            {
+                totalLabel.color = new Color(.2f, 1f, .3f);
+                yield return new WaitForSecondsRealtime(.22f);
+                totalLabel.color = normal;
+                yield return new WaitForSecondsRealtime(.18f);
+            }
+            flashAnimation = null;
         }
 
         private void Update()
@@ -134,6 +159,7 @@ namespace GameJamOcean.UI
 
         private void OnDestroy()
         {
+            if (instance == this) instance = null;
             if (progress != null) progress.TotalGoldChanged -= OnGoldChanged;
         }
     }

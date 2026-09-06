@@ -39,8 +39,9 @@ namespace GameJamOcean.World
 
             Vector3 inverseScale = new(1f / Mathf.Max(.001f, transform.lossyScale.x),
                 1f / Mathf.Max(.001f, transform.lossyScale.y), 1f / Mathf.Max(.001f, transform.lossyScale.z));
-            halo = GameObject.CreatePrimitive(PrimitiveType.Quad).transform;
-            halo.name = "Soft Halo"; halo.SetParent(transform, false); halo.localScale = Vector3.Scale(Vector3.one * 2.4f, inverseScale);
+            halo = GameObject.CreatePrimitive(PrimitiveType.Sphere).transform;
+            halo.name = "Spherical Soft Halo"; halo.SetParent(transform, false);
+            halo.localScale = Vector3.Scale(Vector3.one * 1.3f, inverseScale);
             Destroy(halo.GetComponent<Collider>());
             halo.GetComponent<Renderer>().material = GlowMaterial(new Color(lightColor.r, lightColor.g, lightColor.b, .22f), .22f);
 
@@ -67,8 +68,6 @@ namespace GameJamOcean.World
         private void Update()
         {
             if (pivot != null) pivot.Rotate(0f, rotationDegreesPerSecond * Time.deltaTime, 0f, Space.Self);
-            Camera camera = Camera.main;
-            if (halo != null && camera != null) halo.rotation = Quaternion.LookRotation(halo.position - camera.transform.position, camera.transform.up);
         }
 
         private static Material GlowMaterial(Color color, float alpha)

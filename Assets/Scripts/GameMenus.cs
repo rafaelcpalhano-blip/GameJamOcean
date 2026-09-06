@@ -22,6 +22,9 @@ namespace GameJamOcean.UI
     {
         private const string Ocean = "OceanScene_3D";
         private const string SettingsKey = "GameJamOcean.Settings.";
+        private const string TutorialsArmedKey = "GameJamOcean.Tutorials.Armed";
+        private const string OceanTutorialKey = "GameJamOcean.Tutorials.OceanShown";
+        private const string DiveTutorialKey = "GameJamOcean.Tutorials.DiveShown";
         private static GameMenus instance;
         private static int resumeFrame = -1;
         public static bool BoatRecoveryActive { get; set; }
@@ -31,6 +34,7 @@ namespace GameJamOcean.UI
         private bool firstScene = true, requestMain, main, open, loading;
         private bool requestIntro, transitioning;
         private bool showingLetter;
+        private bool initialLetter;
         private Coroutine typewriter;
         private static readonly string[] RescueMessages =
         {
@@ -80,7 +84,7 @@ namespace GameJamOcean.UI
             DontDestroyOnLoad(gameObject);
             gameAudio = gameObject.AddComponent<GameJamOcean.Audio.GameAudio>();
             SteeringMultiplier = Mathf.Clamp(PlayerPrefs.GetFloat(SettingsKey + "Steering", 1f), .85f, 1.15f);
-            AudioListener.volume = Mathf.Clamp01(PlayerPrefs.GetFloat(SettingsKey + "Volume", 1f));
+            AudioListener.volume = Mathf.Clamp01(PlayerPrefs.GetFloat(SettingsKey + "Volume", .5f));
             SceneManager.sceneLoaded += OnSceneLoaded;
         }
 
@@ -96,6 +100,7 @@ namespace GameJamOcean.UI
             if (scene.name == Ocean) OceanGoldHUD.Ensure();
             if (scene.name == Ocean) GameJamOcean.Boat.BoatVisualUpgrade3D.ConfigureScene(scene);
             if (scene.name == Ocean) GameJamOcean.World.LighthouseEndGameLight3D.ConfigureScene(scene);
+            if (scene.name == Ocean) GameJamOcean.World.OceanHorizonBackdrop3D.ConfigureScene(scene);
             loading = false;
             bool showMain = scene.name == Ocean && (firstScene || requestMain);
             firstScene = false;
@@ -107,6 +112,12 @@ namespace GameJamOcean.UI
                 if (requestIntro) { requestIntro = false; ShowLetter(); }
                 else ShowHome();
             }
+            else if (scene.name == "DiveScene" && PlayerPrefs.GetInt(TutorialsArmedKey, 0) == 1
+                     && PlayerPrefs.GetInt(DiveTutorialKey, 0) == 0)
+            {
+                Freeze(false);
+                ShowControlsTutorial(false);
+            }
         }
 
         private void Update()
@@ -117,8 +128,8 @@ namespace GameJamOcean.UI
                 bool direction = keys != null && (keys.wKey.wasPressedThisFrame || keys.aKey.wasPressedThisFrame
                     || keys.sKey.wasPressedThisFrame || keys.dKey.wasPressedThisFrame || keys.upArrowKey.wasPressedThisFrame
                     || keys.downArrowKey.wasPressedThisFrame || keys.leftArrowKey.wasPressedThisFrame || keys.rightArrowKey.wasPressedThisFrame);
-                bool click = Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
-                if (Time.frameCount > letterFrame && (direction || click))
+                bool click = !initialLetter && Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
+                if (typewriter == null && Time.frameCount > letterFrame && (direction || click))
                 {
                     showingLetter = false;
                     StopTypewriter();
@@ -221,6 +232,7 @@ namespace GameJamOcean.UI
         {
             GameProgress.Instance.SaveProgress();
             showingLetter = true;
+            initialLetter = true;
             letterFrame = Time.frameCount;
             ClearPanel("UMA NOVA VIDA");
             panel.GetComponent<Image>().color = new Color(.02f, .09f, .14f, .9f);
@@ -234,16 +246,20 @@ namespace GameJamOcean.UI
             BeginTypewriter(body);
         }
 
-        public static void ShowRescueLetter()
+        public static void ShowRescueLetter(bool firstDeathFree, int chargedGold, int configuredCost)
         {
             BoatRecoveryActive = false;
             if (instance == null) return;
             instance.Freeze(false);
             instance.showingLetter = true;
+            instance.initialLetter = false;
             instance.letterFrame = Time.frameCount;
             instance.ClearPanel("DE VOLTA AO ESTALEIRO");
             instance.panel.GetComponent<Image>().color = new Color(.02f, .09f, .14f, .9f);
-            TMP_Text body = instance.Label(RescueMessages[UnityEngine.Random.Range(0, RescueMessages.Length)], -130, 26, 240);
+            string message = firstDeathFree
+                ? "Destruir o barco custa mais do que mantê-lo em boas condições, então procure deixar a manutenção em dia. Desta vez, como sua missão é nobre e ajuda o vilarejo a crescer, o primeiro conserto fica por conta da vila."
+                : $"{RescueMessages[UnityEngine.Random.Range(0, RescueMessages.Length)]}\n\nConserto após o naufrágio: {configuredCost} Gold. Valor debitado: {chargedGold} Gold.";
+            TMP_Text body = instance.Label(message, -130, 26, 260);
             instance.Label("Clique ou pressione WASD / setas para continuar", -450, 18);
             instance.gameAudio.StartLetter();
             instance.BeginTypewriter(body);
@@ -295,6 +311,40 @@ namespace GameJamOcean.UI
                 if (follow != null) follow.EvaluateMenuTransition(1f);
             }
             transitioning = false;
+            if (PlayerPrefs.GetInt(TutorialsArmedKey, 0) == 1 && PlayerPrefs.GetInt(OceanTutorialKey, 0) == 0)
+            {
+                ShowControlsTutorial(true);
+                yield break;
+            }
+            Resume();
+        }
+
+        private void PrepareNewGameTutorials()
+        {
+            PlayerPrefs.SetInt(TutorialsArmedKey, 1);
+            PlayerPrefs.SetInt(OceanTutorialKey, 0);
+            PlayerPrefs.SetInt(DiveTutorialKey, 0);
+            PlayerPrefs.Save();
+        }
+
+        private void ShowControlsTutorial(bool ocean)
+        {
+            EnsureCanvas();
+            canvas.gameObject.SetActive(true);
+            ClearPanel(ocean ? "CONTROLES DO BARCO" : "CONTROLES DO MERGULHO");
+            panel.GetComponent<Image>().color = new Color(.02f, .09f, .14f, .88f);
+            string controls = ocean
+                ? "WASD / Setas — mover e virar\nShift — turbo\nF — interagir\nP — pausar\nBotão direito do mouse — movimentar a câmera"
+                : "WASD / Setas — nadar\nShift — dash\nClique esquerdo / segurar — atacar\nF — interagir\nP — pausar\n\nMuito cuidado com as profundezas do mar. Alguns bichos são mais hostis, outros são mais astutos, mas uma coisa é certa: estamos em perigo o tempo todo.";
+            Label(controls, -105, ocean ? 24 : 21, ocean ? 230 : 285);
+            Button("ENTENDI", -430, () => CloseControlsTutorial(ocean));
+        }
+
+        private void CloseControlsTutorial(bool ocean)
+        {
+            PlayerPrefs.SetInt(ocean ? OceanTutorialKey : DiveTutorialKey, 1);
+            if (!ocean) PlayerPrefs.SetInt(TutorialsArmedKey, 0);
+            PlayerPrefs.Save();
             Resume();
         }
 
@@ -307,7 +357,11 @@ namespace GameJamOcean.UI
                 var progress = GameProgress.Instance;
                 bool hasSave = progress != null && progress.HasSavedGame;
                 Label(hasSave ? $"Sua aldeia • nível {progress.GetLevel(UpgradeKind.Island)}" : "Uma nova aventura espera por você", -85, 20);
-                Button(hasSave ? "Continuar" : "Iniciar", -145, () => { if (hasSave) StartGameplay(); else ShowLetter(); });
+                Button(hasSave ? "Continuar" : "Iniciar", -145, () =>
+                {
+                    if (hasSave) StartGameplay();
+                    else { PrepareNewGameTutorials(); ShowLetter(); }
+                });
                 if (hasSave) Button("Novo jogo", -210, ConfirmNewGame);
                 Button("Ajustes", -285, ShowSettings);
             }
@@ -328,6 +382,7 @@ namespace GameJamOcean.UI
             {
                 if (!CanLoadOcean()) return;
                 GameProgress.Instance.ResetProgress();
+                PrepareNewGameTutorials();
                 InteractionDiscoveryStore.ResetAll();
                 DivePointSpawnManager3D.ResetRuntimeState();
                 requestIntro = true;

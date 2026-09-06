@@ -673,8 +673,7 @@ namespace GameJamOcean.Diving
             switch (kind)
             {
                 case DivePowerUpKind.Health:
-                    if (health.CurrentHealth >= health.MaximumHealth) return;
-                    health.Heal(Mathf.Min(healthRestored, health.MaximumHealth - health.CurrentHealth));
+                    if (!health.AddTemporaryHealth(healthRestored, 9f)) return;
                     SpriteRenderer playerSprite = diver.GetComponent<SpriteRenderer>();
                     if (playerSprite != null)
                     {

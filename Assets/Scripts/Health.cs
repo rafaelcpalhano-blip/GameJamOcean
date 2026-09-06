@@ -83,6 +83,15 @@ namespace GameJamOcean.Combat
             HealthChanged?.Invoke(this);
         }
 
+        public bool AddTemporaryHealth(float amount, float temporaryMaximum)
+        {
+            if (IsDead || amount <= 0f || currentHealth >= temporaryMaximum) return false;
+            maximumHealth = Mathf.Max(maximumHealth, temporaryMaximum);
+            currentHealth = Mathf.Min(temporaryMaximum, currentHealth + amount);
+            HealthChanged?.Invoke(this);
+            return true;
+        }
+
         public void SetMaximumHealth(float value, bool restoreToFull = false)
         {
             maximumHealth = Mathf.Max(1f, value);
