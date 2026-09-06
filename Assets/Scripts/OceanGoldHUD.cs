@@ -1,4 +1,5 @@
 using System.Collections;
+using GameJamOcean.Collectibles;
 using GameJamOcean.Progression;
 using TMPro;
 using UnityEngine;
@@ -97,8 +98,15 @@ namespace GameJamOcean.UI
             GameObject driver = Instantiate(settings.goldSpinPrefab, transform);
             driver.name = "goldspin Animation Driver";
             driver.transform.localPosition = Vector3.one * 10000f;
-            foreach (Collider2D collider in driver.GetComponentsInChildren<Collider2D>(true)) Destroy(collider);
-            foreach (Rigidbody2D body in driver.GetComponentsInChildren<Rigidbody2D>(true)) Destroy(body);
+            // This prefab is only an animation source for the HUD. GoldCollectible2D
+            // requires its CircleCollider2D, so disabling the gameplay components is
+            // safer than trying to remove them whenever OceanScene is loaded.
+            foreach (GoldCollectible2D collectible in driver.GetComponentsInChildren<GoldCollectible2D>(true))
+                collectible.enabled = false;
+            foreach (Collider2D collider in driver.GetComponentsInChildren<Collider2D>(true))
+                collider.enabled = false;
+            foreach (Rigidbody2D body in driver.GetComponentsInChildren<Rigidbody2D>(true))
+                body.simulated = false;
             goldSpinDriver = driver.GetComponentInChildren<SpriteRenderer>(true);
             if (goldSpinDriver != null) goldSpinDriver.enabled = false;
             Animator animator = driver.GetComponentInChildren<Animator>(true);
