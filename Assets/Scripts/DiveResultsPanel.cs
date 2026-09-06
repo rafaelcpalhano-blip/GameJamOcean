@@ -10,6 +10,7 @@ namespace GameJamOcean.Flow
     {
         public void Show(DiveSessionManager session, bool won, int total, Sprite coin, Action onContinue)
         {
+            GameJamOcean.Audio.GameAudio.Instance?.PlayCoinReward();
             var canvasObject = new GameObject("Dive Results Canvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             canvasObject.transform.SetParent(transform, false);
             var canvas = canvasObject.GetComponent<Canvas>();

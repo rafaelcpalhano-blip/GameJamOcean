@@ -4780,11 +4780,15 @@ MonoBehaviour:
   maximumHeadingSpeed: 45
   enableMouseOrbit: 1
   mouseOrbitSensitivity: 0.12
-  maximumOrbitAngle: 100
+  maximumOrbitAngle: 180
   orbitSmoothTime: 0.3
   orbitReturnTime: 1.5
+  orbitReturnDelay: 1.5
+  minimumZoomDistance: 10
+  maximumZoomDistance: 20
+  zoomSensitivity: 0.012
   verticalLookSensitivity: 0.06
-  maximumLookUp: 6
+  maximumLookUp: 9
   maximumLookDown: 4
   horizonMargin: 3
   enableWaterMotion: 1

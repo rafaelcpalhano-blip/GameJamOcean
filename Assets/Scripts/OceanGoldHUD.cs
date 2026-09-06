@@ -83,19 +83,23 @@ namespace GameJamOcean.UI
             deltaLabel.text = delta > 0 ? $"+{delta}" : delta.ToString();
             deltaLabel.color = delta > 0 ? new Color(.25f, 1f, .35f) : new Color(1f, .25f, .2f);
             RectTransform rect = deltaLabel.rectTransform;
-            rect.anchoredPosition = new Vector2(72, -42);
+            rect.anchoredPosition = new Vector2(82, -48);
             deltaLabel.alpha = 1f;
             float elapsed = 0f;
-            while (elapsed < 1.15f)
+            const float duration = 2f;
+            while (elapsed < duration)
             {
                 elapsed += Time.unscaledDeltaTime;
-                float t = Mathf.Clamp01(elapsed / 1.15f);
-                rect.anchoredPosition = Vector2.Lerp(new Vector2(72, -42), new Vector2(72, -4), t);
+                float t = Mathf.Clamp01(elapsed / duration);
+                rect.anchoredPosition = Vector2.Lerp(new Vector2(82, -48), new Vector2(82, -5), t);
+                float emphasis = 1f + Mathf.Sin(t * Mathf.PI) * .18f;
+                rect.localScale = Vector3.one * emphasis;
                 if (t > .75f) deltaLabel.alpha = 1f - (t - .75f) / .25f;
                 yield return null;
             }
             totalLabel.text = finalTotal.ToString();
             deltaLabel.text = "";
+            rect.localScale = Vector3.one;
             deltaAnimation = null;
         }
 
@@ -106,13 +110,13 @@ namespace GameJamOcean.UI
             gameObject.AddComponent<GraphicRaycaster>();
             RectTransform holder = new GameObject("Gold", typeof(RectTransform)).GetComponent<RectTransform>();
             holder.SetParent(transform, false); holder.anchorMin = holder.anchorMax = holder.pivot = new Vector2(1,1);
-            holder.sizeDelta = new Vector2(240,90); holder.anchoredPosition = new Vector2(-32,-30);
+            holder.sizeDelta = new Vector2(280,110); holder.anchoredPosition = new Vector2(-32,-30);
             coin = new GameObject("Rotating Coin", typeof(RectTransform), typeof(Image)).GetComponent<RectTransform>();
             coin.SetParent(holder, false); coin.anchorMin = coin.anchorMax = new Vector2(0,1); coin.pivot = new Vector2(.5f,.5f);
-            coin.sizeDelta = new Vector2(52,52); coin.anchoredPosition = new Vector2(30,-30);
+            coin.sizeDelta = new Vector2(62,62); coin.anchoredPosition = new Vector2(34,-34);
             coinImage = coin.GetComponent<Image>(); coinImage.sprite = CreateCoinSprite(); coinImage.color = Color.white;
-            totalLabel = CreateText("Total", holder, new Vector2(145,48), new Vector2(72,-5), 32, Color.white);
-            deltaLabel = CreateText("Delta", holder, new Vector2(145,35), new Vector2(72,-42), 24, Color.white);
+            totalLabel = CreateText("Total", holder, new Vector2(175,52), new Vector2(82,-5), 38, Color.white);
+            deltaLabel = CreateText("Delta", holder, new Vector2(175,40), new Vector2(82,-48), 28, Color.white);
             ConfigureGoldSpinDriver();
         }
 

@@ -34,7 +34,6 @@ namespace GameJamOcean.UI
         private bool firstScene = true, requestMain, main, open, loading;
         private bool requestIntro, transitioning;
         private bool showingLetter;
-        private bool initialLetter;
         private Coroutine typewriter;
         private static readonly string[] RescueMessages =
         {
@@ -128,7 +127,7 @@ namespace GameJamOcean.UI
                 bool direction = keys != null && (keys.wKey.wasPressedThisFrame || keys.aKey.wasPressedThisFrame
                     || keys.sKey.wasPressedThisFrame || keys.dKey.wasPressedThisFrame || keys.upArrowKey.wasPressedThisFrame
                     || keys.downArrowKey.wasPressedThisFrame || keys.leftArrowKey.wasPressedThisFrame || keys.rightArrowKey.wasPressedThisFrame);
-                bool click = !initialLetter && Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
+                bool click = Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
                 if (typewriter == null && Time.frameCount > letterFrame && (direction || click))
                 {
                     showingLetter = false;
@@ -232,7 +231,6 @@ namespace GameJamOcean.UI
         {
             GameProgress.Instance.SaveProgress();
             showingLetter = true;
-            initialLetter = true;
             letterFrame = Time.frameCount;
             ClearPanel("UMA NOVA VIDA");
             panel.GetComponent<Image>().color = new Color(.02f, .09f, .14f, .9f);
@@ -252,7 +250,6 @@ namespace GameJamOcean.UI
             if (instance == null) return;
             instance.Freeze(false);
             instance.showingLetter = true;
-            instance.initialLetter = false;
             instance.letterFrame = Time.frameCount;
             instance.ClearPanel("DE VOLTA AO ESTALEIRO");
             instance.panel.GetComponent<Image>().color = new Color(.02f, .09f, .14f, .9f);

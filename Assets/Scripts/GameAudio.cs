@@ -87,6 +87,11 @@ namespace GameJamOcean.Audio
             if (settings != null && settings.harpoonShot != null)
                 effects.PlayOneShot(settings.harpoonShot, 0.15f);
         }
+        public void PlayCoinReward()
+        {
+            if (settings != null && settings.coinReward != null)
+                effects.PlayOneShot(settings.coinReward);
+        }
         private void OnDestroy() { if (Instance == this) Instance = null; }
         // Route future obstacle/dive effects through this source to respect the effects slider.
         public void PlayEffect(AudioClip clip) { if (clip != null) effects.PlayOneShot(clip); }

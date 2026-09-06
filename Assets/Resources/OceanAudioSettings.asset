@@ -19,6 +19,7 @@ MonoBehaviour:
   harpoonShot: {fileID: 8300000, guid: 2be5e56fb0c99144484b0d79a21e6d18, type: 3}
   diveAmbience: {fileID: 8300000, guid: 228851c69bfdfb6479768d9755fff634, type: 3}
   diveRandomAmbience: {fileID: 8300000, guid: 35a56db5f356630449b845c2085977c6, type: 3}
+  coinReward: {fileID: 8300000, guid: cbf1eb4627d04d8c92dbe6de3c6633d0, type: 3}
   randomMinimumInterval: 2
   randomMaximumInterval: 5
   randomAmbienceGain: 0.6

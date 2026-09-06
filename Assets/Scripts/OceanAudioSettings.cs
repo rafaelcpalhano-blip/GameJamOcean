@@ -12,6 +12,7 @@ namespace GameJamOcean.Audio
         public AudioClip harpoonShot;
         public AudioClip diveAmbience;
         public AudioClip diveRandomAmbience;
+        public AudioClip coinReward;
         [Min(.1f)] public float randomMinimumInterval = 2f;
         [Min(.1f)] public float randomMaximumInterval = 5f;
         [Range(0f, 1f)] public float randomAmbienceGain = .6f;

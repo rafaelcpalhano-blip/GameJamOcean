@@ -48,6 +48,8 @@ namespace GameJamOcean.Boat
         [Tooltip("Custo cobrado da segunda destruição do barco em diante.")]
         [SerializeField, Min(0)] private int destructionGoldCost = 200;
         private bool sinking;
+        private int activeBoatLevel = 1;
+        private bool switchingBoat;
 
         public Health Health => health;
         public float HealthPercentage => health != null ? health.NormalizedHealth : 0f;
@@ -63,6 +65,7 @@ namespace GameJamOcean.Boat
         {
             health = GetComponent<Health>();
             controller = GetComponent<BoatController3D>();
+            activeBoatLevel = GameProgress.HasInstance ? GameProgress.Instance.SelectedBoatLevel : 1;
             ApplyStats(true);
         }
 
@@ -70,13 +73,15 @@ namespace GameJamOcean.Boat
         {
             health ??= GetComponent<Health>();
             health.Died += OnBoatDestroyed;
+            health.HealthChanged += SaveActiveBoatHealth;
             if (GameProgress.HasInstance) GameProgress.Instance.UpgradesChanged += ApplyPurchasedUpgrades;
         }
 
         private void Start()
         {
             ApplyPurchasedUpgrades();
-            if (!OceanReturnState3D.TryRestoreHealth(health)) health.Restore();
+            if (!OceanReturnState3D.TryRestoreHealth(health)) RestoreSelectedBoatHealth();
+            else SaveActiveBoatHealth(health);
         }
 
         private void ApplyPurchasedUpgrades()
@@ -100,6 +105,7 @@ namespace GameJamOcean.Boat
             if (health != null)
             {
                 health.Died -= OnBoatDestroyed;
+                health.HealthChanged -= SaveActiveBoatHealth;
             }
         }
 
@@ -182,6 +188,38 @@ namespace GameJamOcean.Boat
             health.Restore();
             controller.RefillTurbo();
             controller.enabled = true;
+        }
+
+        public bool SelectBoat(int level)
+        {
+            if (!GameProgress.HasInstance || level == activeBoatLevel
+                || level < 1 || level > GameProgress.Instance.GetLevel(UpgradeKind.BoatHull)) return false;
+            switchingBoat = true;
+            try
+            {
+                GameProgress.Instance.SetSavedBoatHealth(activeBoatLevel, health.CurrentHealth);
+                activeBoatLevel = level;
+                if (!GameProgress.Instance.SelectBoat(level)) return false;
+                RestoreSelectedBoatHealth();
+                return true;
+            }
+            finally { switchingBoat = false; }
+        }
+
+        private void RestoreSelectedBoatHealth()
+        {
+            if (!GameProgress.HasInstance) { health.Restore(); return; }
+            activeBoatLevel = GameProgress.Instance.SelectedBoatLevel;
+            float saved = GameProgress.Instance.GetSavedBoatHealth(activeBoatLevel);
+            if (saved < 0f) health.Restore();
+            else health.SetCurrentHealth(Mathf.Min(saved, health.MaximumHealth));
+            GameProgress.Instance.SetSavedBoatHealth(activeBoatLevel, health.CurrentHealth);
+        }
+
+        private void SaveActiveBoatHealth(Health changedHealth)
+        {
+            if (!switchingBoat && GameProgress.HasInstance && changedHealth != null)
+                GameProgress.Instance.SetSavedBoatHealth(activeBoatLevel, changedHealth.CurrentHealth);
         }
 
         private void OnBoatDestroyed(Health destroyedHealth, GameObject damageSource)

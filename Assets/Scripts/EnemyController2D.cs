@@ -37,14 +37,24 @@ namespace GameJamOcean.Enemies
         [SerializeField, Min(1f)] private float distantSpeedMultiplier = 1.65f;
         [SerializeField, Range(0f, 1f)] private float finalWaveThreshold = .85f;
         [SerializeField, Min(1f)] private float finalWaveSpeedMultiplier = 1.3f;
+        [Header("Isolation Pressure Dash")]
+        [SerializeField, Min(1f)] private float isolationDistance = 10f;
+        [SerializeField, Min(.1f)] private float isolationCheckInterval = 1f;
+        [SerializeField, Min(.1f)] private float isolationDashCooldown = 5f;
+        [SerializeField, Min(.1f)] private float isolationDashDuration = .55f;
         private static readonly List<EnemyController2D> ActiveEnemies = new();
+        private static float nextIsolationCheck;
         private float weavePhase, weaveFrequency;
         private GameJamOcean.World.MovementBounds2D movementBounds;
         private DiveSessionManager sessionManager;
         private float currentAggression = 1f;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetActiveEnemies() => ActiveEnemies.Clear();
+        private static void ResetActiveEnemies()
+        {
+            ActiveEnemies.Clear();
+            nextIsolationCheck = 0f;
+        }
 
         [Header("Attack")]
         [SerializeField] private EnemyAttackType attackType = EnemyAttackType.Melee;
@@ -125,6 +135,9 @@ namespace GameJamOcean.Enemies
         private OctopusStrikePhase octopusStrikePhase;
         private float octopusStrikePhaseUntil, octopusNextLunge;
         private Vector2 octopusEscapeDirection;
+        private Vector2 isolationDashTarget;
+        private float isolationDashUntil;
+        private float isolationDashSpeed;
 
         private void Awake()
         {
@@ -192,6 +205,13 @@ namespace GameJamOcean.Enemies
             if (target == null || targetHealth == null || targetHealth.IsDead)
             {
                 enemyRigidbody.linearVelocity = Vector2.zero;
+                UpdateMovementAnimation();
+                return;
+            }
+
+            TryStartGroupIsolationDash((Vector2)target.position);
+            if (UpdateIsolationDash())
+            {
                 UpdateMovementAnimation();
                 return;
             }
@@ -282,6 +302,71 @@ namespace GameJamOcean.Enemies
             }
             enemyRigidbody.linearVelocity = velocity;
             UpdateMovementAnimation();
+        }
+
+        private void TryStartGroupIsolationDash(Vector2 playerPosition)
+        {
+            if (Time.time < nextIsolationCheck) return;
+            nextIsolationCheck = Time.time + isolationCheckInterval;
+
+            Vector2 center = Vector2.zero;
+            int aliveCount = 0;
+            var candidates = new List<EnemyController2D>(ActiveEnemies.Count);
+            foreach (EnemyController2D enemy in ActiveEnemies)
+            {
+                if (enemy == null || enemy.enemyHealth == null || enemy.enemyHealth.IsDead) continue;
+                center += enemy.enemyRigidbody.position;
+                aliveCount++;
+                if (Time.time >= enemy.isolationDashUntil) candidates.Add(enemy);
+            }
+            if (aliveCount == 0 || Vector2.Distance(playerPosition, center / aliveCount) < isolationDistance)
+                return;
+
+            candidates.Sort((left, right) =>
+            {
+                int tier = left.SpeciesTier.CompareTo(right.SpeciesTier);
+                return tier != 0 ? tier : left.GetInstanceID().CompareTo(right.GetInstanceID());
+            });
+            int count = Mathf.Min(3, candidates.Count);
+            for (int index = 0; index < count; index++)
+                candidates[index].BeginIsolationDash(playerPosition);
+            nextIsolationCheck = Time.time + isolationDashCooldown;
+        }
+
+        private int SpeciesTier => speciesProfile == SpeciesProfile.Standard
+            ? int.MaxValue : (int)speciesProfile;
+
+        private void BeginIsolationDash(Vector2 playerPosition)
+        {
+            Vector2 start = enemyRigidbody.position;
+            isolationDashTarget = Vector2.Lerp(start, playerPosition, .5f);
+            float distance = Vector2.Distance(start, isolationDashTarget);
+            isolationDashSpeed = distance / Mathf.Max(.1f, isolationDashDuration);
+            isolationDashUntil = Time.time + isolationDashDuration;
+        }
+
+        private bool UpdateIsolationDash()
+        {
+            if (Time.time >= isolationDashUntil) return false;
+            Vector2 remaining = isolationDashTarget - enemyRigidbody.position;
+            if (remaining.sqrMagnitude <= .0025f)
+            {
+                isolationDashUntil = 0f;
+                enemyRigidbody.linearVelocity = Vector2.zero;
+                return false;
+            }
+            Vector2 velocity = remaining.normalized * isolationDashSpeed;
+            if (velocity.magnitude * Time.fixedDeltaTime > remaining.magnitude)
+                velocity = remaining / Time.fixedDeltaTime;
+            if (movementBounds != null)
+            {
+                Vector2 next = movementBounds.ClampPoint(
+                    enemyRigidbody.position + velocity * Time.fixedDeltaTime, Vector2.one * .2f);
+                velocity = (next - enemyRigidbody.position) / Time.fixedDeltaTime;
+            }
+            enemyRigidbody.linearVelocity = velocity;
+            UpdateVisualDirection(velocity.x);
+            return true;
         }
 
         private void TryAttack()

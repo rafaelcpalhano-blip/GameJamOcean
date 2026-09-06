@@ -253,18 +253,24 @@ namespace GameJamOcean.World
             var body = boat.GetComponent<Rigidbody>();
             Vector3 push = body != null ? Flat(body.position - sharkBody.position).normalized : direction;
             if (push.sqrMagnitude < .001f) push = direction;
-            bool cargoBoat = GameJamOcean.Progression.GameProgress.HasInstance
-                && GameJamOcean.Progression.GameProgress.Instance.GetLevel(
-                    GameJamOcean.Progression.UpgradeKind.BoatHull) >= 3;
-            if (cargoBoat)
-            {
-                boat.RejectCollisionRecoil();
-                sharkBody.AddForce(-push * Mathf.Max(4.5f, impactPushSpeed * 3f), ForceMode.VelocityChange);
-                return;
-            }
             FindFirstObjectByType<GameJamOcean.CameraSystem.CameraFollow3D>()
                 ?.PlayCollisionImpact(push);
             boat.GetComponent<BoatWaterMotion3D>()?.PlayCollisionImpact(push);
+
+            bool cargoBoat = visual != null && visual.CurrentVesselLevel == 3;
+            Vector3 boatForward = Flat(boat.NavigationForward).normalized;
+            Vector3 boatToShark = Flat(sharkBody.position - boat.transform.position).normalized;
+            bool frontalImpact = boatToShark.sqrMagnitude > .001f
+                && Vector3.Dot(boatForward, boatToShark) >= .45f;
+            if (cargoBoat && frontalImpact)
+            {
+                boat.RejectCollisionRecoil();
+                Vector3 boatRight = Vector3.Cross(Vector3.up, boatForward).normalized;
+                float sideSign = Vector3.Dot(boatToShark, boatRight) >= 0f ? 1f : -1f;
+                sharkBody.AddForce(boatRight * sideSign * Mathf.Max(5.5f, impactPushSpeed * 4f),
+                    ForceMode.VelocityChange);
+                return;
+            }
             if (!health.IsDead && body != null && !body.isKinematic)
             {
                 body.AddForce(push * impactPushSpeed, ForceMode.VelocityChange);

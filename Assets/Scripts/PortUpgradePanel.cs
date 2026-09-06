@@ -71,6 +71,24 @@ namespace GameJamOcean.Progression
         private float nextPurchaseTime;
         private GameProgress progress;
         private bool firstPierGoldHintShown;
+        private readonly Button[] boatButtons = new Button[3];
+        private Button colorButton;
+        private GameObject colorPanel;
+        private readonly Image[] colorSamples = new Image[3];
+        private readonly Color[] pendingColors = new Color[3];
+        private readonly Color[] initialColors = new Color[3];
+        private readonly bool[] pendingCustomized = new bool[3];
+        private TMP_Text colorCostLabel;
+        private int selectedColorSlot;
+        private const int ColorPrice = 50;
+        private static readonly string[] VillageThanks =
+        {
+            "",
+            "Os moradores agradecem pelo novo Pier! Para tornar este lugar seguro diante das grandes embarcações, ainda precisaremos evoluir bastante. Nosso objetivo é fazer o farol voltar a brilhar. Será um caminho árduo, mas recompensador.",
+            "A vila está crescendo graças à sua ajuda. Os moradores agradecem por mais este avanço!",
+            "Cada melhoria torna nossa comunidade mais forte. Muito obrigado por continuar ao nosso lado!",
+            "O farol voltou a brilhar! Todo o vilarejo agradece por você ter tornado este lugar mais seguro."
+        };
 
         public void Configure(GameObject first, GameObject second, GameObject third, GameObject fourth, BoatController3D targetBoat)
         {
@@ -187,8 +205,9 @@ namespace GameJamOcean.Progression
             UpgradeKind kind = VisibleUpgrades[index];
             bool completedBefore = progress.IsGameCompleted;
             bool purchased = progress.TryPurchase(kind, offeredLevels[index], out string message);
-            statusLabel.text = purchased && kind == UpgradeKind.Island && offeredLevels[index] == 0
-                ? "Para proteger este lugar das grandes embarcações, ainda precisaremos evoluir bastante. Nosso objetivo é fazer o farol voltar a brilhar. Será um caminho árduo, mas recompensador."
+            int villageLevel = progress.GetLevel(UpgradeKind.Island);
+            statusLabel.text = purchased && kind == UpgradeKind.Island
+                ? VillageThanks[Mathf.Clamp(villageLevel, 1, 4)]
                 : progress.IsGameCompleted ? "Aldeia N4 — jogo concluído!" : message;
             Refresh();
             if (!completedBefore && progress.IsGameCompleted)
@@ -239,6 +258,7 @@ namespace GameJamOcean.Progression
                 if (kind == UpgradeKind.Island && (villageLevel1 == null || villageLevel2 == null || villageLevel3 == null || villageLevel4 == null)) buttons[i].interactable = false;
             }
             if (repairButton != null) repairButton.gameObject.SetActive(!firstPierUpgrade);
+            RefreshBoatSelection(firstPierUpgrade);
             if (!valid) statusLabel.text = error;
         }
 
@@ -293,7 +313,145 @@ namespace GameJamOcean.Progression
             repairButton = ButtonUI("Repair Boat", panel, new Vector2(650, 55), new Vector2(0, -520), out repairPrice);
             repairButton.onClick.AddListener(RepairBoat);
             statusLabel = Label("Status", panel, new Vector2(820, 90), new Vector2(0, -600), "", 21);
+            for (int level = 1; level <= 3; level++)
+            {
+                int capturedLevel = level;
+                boatButtons[level - 1] = ButtonUI($"Boat {level}", panel, new Vector2(130, 72),
+                    new Vector2(-245 + (level - 1) * 145, -700), out TMP_Text boatText);
+                boatText.text = $"BOAT {level}";
+                boatText.rectTransform.sizeDelta = new Vector2(125, 24);
+                boatText.rectTransform.anchoredPosition = new Vector2(0, -21);
+                Image boatIcon = Rect("Boat Icon", boatButtons[level - 1].transform,
+                    new Vector2(72, 38), new Vector2(0, -5)).gameObject.AddComponent<Image>();
+                boatIcon.sprite = CreateBoatIconSprite(level);
+                boatIcon.preserveAspect = true;
+                boatIcon.raycastTarget = false;
+                boatButtons[level - 1].onClick.AddListener(() => SelectBoat(capturedLevel));
+            }
+            colorButton = ButtonUI("Boat Colors", panel, new Vector2(210, 72), new Vector2(275, -700), out TMP_Text colorsText);
+            colorsText.text = "PERSONALIZAR\nCORES";
+            colorButton.onClick.AddListener(OpenColorPanel);
+            BuildColorPanel();
             modal.SetActive(false);
+        }
+
+        private void RefreshBoatSelection(bool hide)
+        {
+            int unlocked = progress.GetLevel(UpgradeKind.BoatHull);
+            int selected = progress.SelectedBoatLevel;
+            for (int i = 0; i < boatButtons.Length; i++)
+            {
+                if (boatButtons[i] == null) continue;
+                bool available = !hide && i + 1 <= unlocked;
+                boatButtons[i].gameObject.SetActive(available);
+                if (available) boatButtons[i].GetComponent<Image>().color = i + 1 == selected
+                    ? new Color(.9f, .68f, .12f) : new Color(.15f, .48f, .5f);
+            }
+            if (colorButton != null) colorButton.gameObject.SetActive(!hide);
+        }
+
+        private void SelectBoat(int level)
+        {
+            BoatStats3D stats = boat != null ? boat.GetComponent<BoatStats3D>() : null;
+            if (stats != null) stats.SelectBoat(level);
+            Refresh();
+        }
+
+        private void BuildColorPanel()
+        {
+            RectTransform root = Rect("Boat Color Panel", modal.transform, new Vector2(680, 500), Vector2.zero);
+            root.anchorMin = root.anchorMax = root.pivot = Vector2.one * .5f;
+            root.gameObject.AddComponent<Image>().color = new Color(.02f, .09f, .14f, .98f);
+            colorPanel = root.gameObject;
+            Label("CORES DO BARCO", root, new Vector2(600, 45), new Vector2(0, -25), "CORES DO BARCO", 28);
+            for (int slot = 0; slot < 3; slot++)
+            {
+                int captured = slot;
+                Button button = ButtonUI($"Cor {slot + 1}", root, new Vector2(150, 70),
+                    new Vector2(-170 + slot * 170, -95), out TMP_Text label);
+                label.text = $"COR {slot + 1}";
+                colorSamples[slot] = button.GetComponent<Image>();
+                button.onClick.AddListener(() => selectedColorSlot = captured);
+            }
+            Color[] palette = { Color.red, new Color(.1f, .45f, 1f), new Color(.15f, .8f, .3f),
+                Color.yellow, Color.white, new Color(.25f, .25f, .25f), Color.black };
+            for (int i = 0; i < palette.Length; i++)
+            {
+                Color choice = palette[i];
+                Button swatch = ButtonUI($"Paleta {i + 1}", root, new Vector2(64, 64),
+                    new Vector2(-225 + i * 75, -205), out TMP_Text swatchText);
+                swatchText.text = "";
+                swatch.GetComponent<Image>().color = choice;
+                swatch.onClick.AddListener(() => ChooseColor(choice));
+            }
+            colorCostLabel = Label("Color Cost", root, new Vector2(500, 40), new Vector2(0, -290),
+                "Custo total: 0 Gold", 23);
+            Button apply = ButtonUI("Apply Colors", root, new Vector2(180, 55), new Vector2(-205, -370), out TMP_Text applyText);
+            applyText.text = "APLICAR"; apply.onClick.AddListener(ApplyColors);
+            Button cancel = ButtonUI("Cancel Colors", root, new Vector2(180, 55), new Vector2(0, -370), out TMP_Text cancelText);
+            cancelText.text = "CANCELAR"; cancel.onClick.AddListener(() => colorPanel.SetActive(false));
+            Button reset = ButtonUI("Reset Colors", root, new Vector2(180, 55), new Vector2(205, -370), out TMP_Text resetText);
+            resetText.text = "RESET GRÁTIS"; reset.onClick.AddListener(ResetColors);
+            colorPanel.SetActive(false);
+        }
+
+        private void OpenColorPanel()
+        {
+            BoatVisualUpgrade3D visual = boat != null ? boat.GetComponent<BoatVisualUpgrade3D>() : null;
+            if (visual == null) return;
+            int level = progress.SelectedBoatLevel;
+            for (int slot = 0; slot < 3; slot++)
+            {
+                initialColors[slot] = pendingColors[slot] = visual.GetDisplayedColor(slot);
+                pendingCustomized[slot] = progress.HasCustomizedBoatColor(level, slot);
+                colorSamples[slot].color = pendingColors[slot];
+            }
+            selectedColorSlot = 0;
+            UpdateColorCost();
+            colorPanel.SetActive(true);
+            colorPanel.transform.SetAsLastSibling();
+        }
+
+        private void ChooseColor(Color color)
+        {
+            pendingColors[selectedColorSlot] = color;
+            pendingCustomized[selectedColorSlot] = true;
+            colorSamples[selectedColorSlot].color = color;
+            UpdateColorCost();
+        }
+
+        private int ChangedColorCount()
+        {
+            int count = 0;
+            for (int slot = 0; slot < 3; slot++)
+                if (Vector4.SqrMagnitude((Vector4)(pendingColors[slot] - initialColors[slot])) > .0001f) count++;
+            return count;
+        }
+
+        private void UpdateColorCost()
+        {
+            if (colorCostLabel != null) colorCostLabel.text = $"Custo total: {ChangedColorCount() * ColorPrice} Gold";
+        }
+
+        private void ApplyColors()
+        {
+            if (!progress.TryApplyBoatColors(progress.SelectedBoatLevel, pendingColors, pendingCustomized,
+                    ChangedColorCount(), ColorPrice, out int cost))
+            {
+                colorCostLabel.text = $"Gold insuficiente — custo total: {cost} Gold";
+                return;
+            }
+            colorPanel.SetActive(false);
+            statusLabel.text = $"Cores aplicadas por {cost} Gold.";
+            Refresh();
+        }
+
+        private void ResetColors()
+        {
+            progress.ResetBoatColors(progress.SelectedBoatLevel);
+            colorPanel.SetActive(false);
+            statusLabel.text = "Cores originais restauradas gratuitamente.";
+            Refresh();
         }
 
         private static RectTransform Rect(string name, Transform parent, Vector2 size, Vector2 position)
@@ -322,6 +480,28 @@ namespace GameJamOcean.Progression
             Button button = rect.gameObject.AddComponent<Button>(); button.targetGraphic = image;
             text = Label("Label", rect, size, Vector2.zero, "", 18);
             return button;
+        }
+
+        private static Sprite CreateBoatIconSprite(int level)
+        {
+            const int width = 64, height = 32;
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            { name = $"Boat {level} menu icon", filterMode = FilterMode.Point };
+            Color32 clear = new(0, 0, 0, 0);
+            Color32[] pixels = new Color32[width * height];
+            for (int i = 0; i < pixels.Length; i++) pixels[i] = clear;
+            Color32 hull = level == 1 ? new Color32(245, 178, 45, 255)
+                : level == 2 ? new Color32(80, 165, 205, 255) : new Color32(214, 89, 55, 255);
+            Color32 cabin = new(235, 240, 244, 255);
+            int left = 8 - level * 2, right = 55 + level * 2;
+            for (int y = 7; y <= 14; y++)
+            for (int x = left + (14 - y); x <= right - (14 - y); x++) pixels[y * width + x] = hull;
+            int cabinWidth = 13 + level * 4;
+            for (int y = 15; y <= 24; y++)
+            for (int x = 32 - cabinWidth / 2; x <= 32 + cabinWidth / 2; x++) pixels[y * width + x] = cabin;
+            texture.SetPixels32(pixels);
+            texture.Apply();
+            return Sprite.Create(texture, new Rect(0, 0, width, height), new Vector2(.5f, .5f), 32f);
         }
     }
 }

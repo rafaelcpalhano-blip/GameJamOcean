@@ -120,7 +120,8 @@ namespace GameJamOcean.CameraSystem
             if (target == null) return;
             float t = Mathf.Clamp01(progress);
             t = t * t * t * (t * (t * 6f - 15f) + 10f); // zero velocity/acceleration at both ends
-            Vector3 endOffset = Quaternion.Euler(0, followTargetYaw ? target.eulerAngles.y : 0, 0) * offset;
+            Vector3 endOffset = Quaternion.Euler(0, followTargetYaw ? target.eulerAngles.y : 0, 0)
+                * GetZoomedOffset();
             Vector3 startOffset = introPosition - target.position;
             float startYaw = Mathf.Atan2(startOffset.x, startOffset.z) * Mathf.Rad2Deg;
             float endYaw = Mathf.Atan2(endOffset.x, endOffset.z) * Mathf.Rad2Deg;
@@ -169,13 +170,19 @@ namespace GameJamOcean.CameraSystem
         [SerializeField] private bool enableMouseOrbit = true;
         [Tooltip("Degrees per pixel of horizontal mouse movement.")]
         [SerializeField, Range(0.01f, 0.5f)] private float mouseOrbitSensitivity = 0.12f;
-        [SerializeField, Range(10f, 170f)] private float maximumOrbitAngle = 100f;
+        [SerializeField, Range(10f, 180f)] private float maximumOrbitAngle = 180f;
         [SerializeField, Min(0.01f)] private float orbitSmoothTime = 0.3f;
         [SerializeField, Min(0.01f)] private float orbitReturnTime = 1.5f;
+        [SerializeField, Min(0f)] private float orbitReturnDelay = 1.5f;
+
+        [Header("Mouse Wheel Zoom")]
+        [SerializeField, Min(.1f)] private float minimumZoomDistance = 10f;
+        [SerializeField, Min(.1f)] private float maximumZoomDistance = 20f;
+        [SerializeField, Min(.001f)] private float zoomSensitivity = .012f;
 
         [Header("Right Mouse Vertical Look")]
         [SerializeField, Range(0.01f, 0.3f)] private float verticalLookSensitivity = 0.06f;
-        [SerializeField, Range(0f, 12f)] private float maximumLookUp = 6f;
+        [SerializeField, Range(0f, 16f)] private float maximumLookUp = 9f;
         [SerializeField, Range(0f, 12f)] private float maximumLookDown = 4f;
         [Tooltip("Keeps the top of the view below the horizon when raising the view.")]
         [SerializeField, Range(1f, 10f)] private float horizonMargin = 3f;
@@ -185,6 +192,8 @@ namespace GameJamOcean.CameraSystem
         private float desiredOrbitYaw;
         private float orbitYaw;
         private float orbitVelocity;
+        private float zoomDistance;
+        private float orbitReleasedAt = float.NegativeInfinity;
         private bool draggingOrbit;
         private bool applicationFocused = true;
 
@@ -216,6 +225,7 @@ namespace GameJamOcean.CameraSystem
             desiredLookElevation = lookElevation = elevationVelocity = 0f;
             followVelocity = Vector3.zero;
             desiredOrbitYaw = orbitYaw = orbitVelocity = 0f;
+            zoomDistance = Mathf.Clamp(offset.magnitude, minimumZoomDistance, maximumZoomDistance);
             draggingOrbit = false;
             applicationFocused = Application.isFocused;
             headingVelocity = 0f;
@@ -305,7 +315,12 @@ namespace GameJamOcean.CameraSystem
         private Vector3 GetRotatedOffset()
         {
             float yaw = (followTargetYaw ? heading : 0f) + orbitYaw;
-            return Quaternion.Euler(0f, yaw, 0f) * offset;
+            return Quaternion.Euler(0f, yaw, 0f) * GetZoomedOffset();
+        }
+
+        private Vector3 GetZoomedOffset()
+        {
+            return offset.sqrMagnitude > .001f ? offset.normalized * zoomDistance : offset;
         }
 
         private void UpdateMouseOrbit()
@@ -313,14 +328,24 @@ namespace GameJamOcean.CameraSystem
             Mouse mouse = Mouse.current;
             bool canOrbit = enableMouseOrbit && applicationFocused && Time.timeScale > 0f
                 && mouse != null && target.GetComponent<BoatController3D>() != null;
+            bool wasDragging = draggingOrbit;
+            bool pointerOverUi = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+            if (canOrbit && !pointerOverUi)
+            {
+                float scroll = mouse.scroll.ReadValue().y;
+                if (Mathf.Abs(scroll) > .01f)
+                {
+                    zoomDistance = Mathf.Clamp(zoomDistance - scroll * zoomSensitivity,
+                        minimumZoomDistance, maximumZoomDistance);
+                }
+            }
             if (!canOrbit || !mouse.rightButton.isPressed)
             {
                 draggingOrbit = false;
             }
             else if (mouse.rightButton.wasPressedThisFrame)
             {
-                draggingOrbit = EventSystem.current == null
-                    || !EventSystem.current.IsPointerOverGameObject();
+                draggingOrbit = !pointerOverUi;
                 // Start from the current view if the player grabs it during recentering.
                 if (draggingOrbit)
                 {
@@ -344,8 +369,12 @@ namespace GameJamOcean.CameraSystem
             }
             else
             {
-                desiredOrbitYaw = 0f;
-                desiredLookElevation = 0f;
+                if (wasDragging) orbitReleasedAt = Time.time;
+                if (Time.time - orbitReleasedAt >= orbitReturnDelay)
+                {
+                    desiredOrbitYaw = 0f;
+                    desiredLookElevation = 0f;
+                }
             }
 
             orbitYaw = Mathf.SmoothDamp(orbitYaw, desiredOrbitYaw, ref orbitVelocity,
@@ -366,6 +395,7 @@ namespace GameJamOcean.CameraSystem
         {
             draggingOrbit = false;
             desiredOrbitYaw = 0f;
+            orbitReleasedAt = float.NegativeInfinity;
             desiredLookElevation = lookElevation = elevationVelocity = 0f;
         }
 

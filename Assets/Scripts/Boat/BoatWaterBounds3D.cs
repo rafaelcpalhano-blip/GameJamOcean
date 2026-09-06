@@ -11,6 +11,7 @@ namespace GameJamOcean.Boat
         [SerializeField, Min(0f)] private float edgePadding = 5f;
 
         private Rigidbody boatRigidbody;
+        private float waterlineY;
 
         public Bounds NavigableBounds
         {
@@ -30,6 +31,7 @@ namespace GameJamOcean.Boat
         private void Awake()
         {
             boatRigidbody = GetComponent<Rigidbody>();
+            waterlineY = boatRigidbody.position.y;
             FindWaterIfNeeded();
         }
 
@@ -45,9 +47,13 @@ namespace GameJamOcean.Boat
             Vector3 position = boatRigidbody.position;
             Vector3 clampedPosition = position;
             clampedPosition.x = Mathf.Clamp(position.x, bounds.min.x, bounds.max.x);
+            // The Rigidbody stays on the water plane. Bobbing and impact pitch belong to
+            // BoatWaterMotion3D's visual child, so terrain edges cannot launch the hull upward.
+            clampedPosition.y = waterlineY;
             clampedPosition.z = Mathf.Clamp(position.z, bounds.min.z, bounds.max.z);
 
             Vector3 velocity = boatRigidbody.linearVelocity;
+            velocity.y = 0f;
             if (!Mathf.Approximately(position.x, clampedPosition.x))
             {
                 velocity.x = 0f;
