@@ -22,22 +22,30 @@ namespace GameJamOcean.Flow
             shade.anchorMin = Vector2.zero; shade.anchorMax = Vector2.one;
             shade.offsetMin = shade.offsetMax = Vector2.zero;
             shade.gameObject.AddComponent<Image>().color = new Color(0, 0.025f, 0.07f, 0.72f);
-            var panel = Rect("Results", canvas.transform, new Vector2(620, 530), Vector2.zero);
-            panel.anchorMin = panel.anchorMax = panel.pivot = Vector2.one * 0.5f;
-            panel.gameObject.AddComponent<Image>().color = new Color(0.025f, 0.12f, 0.18f, 0.98f);
-            Text(panel, "Title", new Vector2(560, 50), new Vector2(0, -25), won ? "MERGULHO CONCLUÍDO!" : "FIM DO MERGULHO", 30, Color.white);
-            Text(panel, "Progress", new Vector2(560, 35), new Vector2(0, -80),
+            var panel = GameJamOcean.UI.EditableUIFactory.CreatePanel(
+                GameJamOcean.UI.EditableUIPanelKind.DiveResultsPanel, canvas.transform,
+                new Vector2(620, 530), new Color(0.025f, 0.12f, 0.18f, 0.98f),
+                "Results", out RectTransform content);
+            TMP_Text title = Text(content, "Title", new Vector2(560, 50), new Vector2(0, -25), won ? "MERGULHO CONCLUÍDO!" : "FIM DO MERGULHO", 30, Color.white);
+            GameJamOcean.UI.GameFontStyles.Apply(title, GameJamOcean.UI.GameFontRole.Display);
+            Text(content, "Progress", new Vector2(560, 35), new Vector2(0, -80),
                 $"Inimigos derrotados: {session.KilledEnemies}/{session.TotalEnemies}", 21, Color.white);
-            Row(panel, session.SmallChestIcon, $"Baú P ×{session.OpenedSmallChests}", session.SecuredGold, -140);
-            Row(panel, session.FinalChestIcon, won ? "Baú G ×1" : "Baú G ×0", session.FinalRewardGold, -210);
-            Row(panel, coin, "Moedas soltas", session.CollectedCoinGold, -280);
-            TMP_Text totalLabel = Text(panel, "Total", new Vector2(560, 45), new Vector2(0, -365),
+            Row(content, session.SmallChestIcon, $"Baú P ×{session.OpenedSmallChests}", session.SecuredGold, -140);
+            Row(content, session.FinalChestIcon, won ? "Baú G ×1" : "Baú G ×0", session.FinalRewardGold, -210);
+            Row(content, coin, "Moedas soltas", session.CollectedCoinGold, -280);
+            TMP_Text totalLabel = Text(content, "Total", new Vector2(560, 45), new Vector2(0, -365),
                 "TOTAL RECEBIDO: 0 OURO", 28, new Color(1, 0.85f, 0.1f));
+            GameJamOcean.UI.GameFontStyles.Apply(totalLabel, GameJamOcean.UI.GameFontRole.Display);
             StartCoroutine(AnimateTotal(totalLabel, total));
-            var buttonRect = Rect("Return", panel, new Vector2(360, 55), new Vector2(0, -445));
-            var image = buttonRect.gameObject.AddComponent<Image>(); image.color = new Color(0.12f, 0.45f, 0.5f);
-            var button = buttonRect.gameObject.AddComponent<Button>(); button.targetGraphic = image;
-            Text(buttonRect, "Label", new Vector2(350, 50), Vector2.zero, "VOLTAR AO OCEANO", 23, Color.white);
+            var button = GameJamOcean.UI.EditableUIFactory.CreateButton("Return", content,
+                new Vector2(360, 55), new Vector2(0, -445), out TMP_Text buttonText,
+                new Color(0.12f, 0.45f, 0.5f));
+            GameJamOcean.UI.GameFontStyles.Apply(buttonText, GameJamOcean.UI.GameFontRole.General);
+            buttonText.text = "VOLTAR AO OCEANO";
+            buttonText.fontSize = 23;
+            buttonText.alignment = TextAlignmentOptions.Center;
+            buttonText.color = Color.white;
+            buttonText.raycastTarget = false;
             button.onClick.AddListener(() => onContinue());
         }
 
@@ -63,7 +71,8 @@ namespace GameJamOcean.Flow
             }
             var label = Text(parent, description, new Vector2(300, 48), new Vector2(-40, y), description, 22, Color.white);
             label.alignment = TextAlignmentOptions.MidlineLeft;
-            Text(parent, description + " gold", new Vector2(145, 48), new Vector2(200, y), $"+{gold} ouro", 22, Color.yellow);
+            TMP_Text reward = Text(parent, description + " gold", new Vector2(145, 48), new Vector2(200, y), $"+{gold} ouro", 22, Color.yellow);
+            GameJamOcean.UI.GameFontStyles.Apply(reward, GameJamOcean.UI.GameFontRole.Display);
         }
         private static RectTransform Rect(string name, Transform parent, Vector2 size, Vector2 position)
         {
@@ -74,7 +83,9 @@ namespace GameJamOcean.Flow
         private static TMP_Text Text(Transform parent, string name, Vector2 size, Vector2 pos, string content, float fontSize, Color tint)
         {
             var text = Rect(name, parent, size, pos).gameObject.AddComponent<TextMeshProUGUI>();
-            text.font = TMP_Settings.defaultFontAsset; text.text = content; text.fontSize = fontSize;
+            GameJamOcean.UI.GameFontStyles.Apply(text, GameJamOcean.UI.GameFontRole.General);
+            text.text = content; text.fontSize = fontSize;
+            text.enableAutoSizing = true; text.fontSizeMin = Mathf.Max(10f, fontSize * .72f); text.fontSizeMax = fontSize;
             text.alignment = TextAlignmentOptions.Center; text.color = tint; text.raycastTarget = false;
             return text;
         }

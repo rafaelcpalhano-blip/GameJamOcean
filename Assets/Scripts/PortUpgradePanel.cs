@@ -59,6 +59,7 @@ namespace GameJamOcean.Progression
         };
         private readonly Button[] buttons = new Button[5];
         private readonly TMP_Text[] labels = new TMP_Text[5];
+        private readonly TMP_Text[] upgradeNames = new TMP_Text[5];
         private readonly TMP_Text[] prices = new TMP_Text[5];
         private readonly GameObject[] rows = new GameObject[5];
         private readonly int[] offeredLevels = new int[5];
@@ -72,15 +73,6 @@ namespace GameJamOcean.Progression
         private GameProgress progress;
         private bool firstPierGoldHintShown;
         private readonly Button[] boatButtons = new Button[3];
-        private Button colorButton;
-        private GameObject colorPanel;
-        private readonly Image[] colorSamples = new Image[3];
-        private readonly Color[] pendingColors = new Color[3];
-        private readonly Color[] initialColors = new Color[3];
-        private readonly bool[] pendingCustomized = new bool[3];
-        private TMP_Text colorCostLabel;
-        private int selectedColorSlot;
-        private const int ColorPrice = 50;
         private static readonly string[] VillageThanks =
         {
             "",
@@ -126,6 +118,7 @@ namespace GameJamOcean.Progression
             previousCursorLock = Cursor.lockState;
             previousCursorVisible = Cursor.visible;
             isOpen = true;
+            GameJamOcean.Audio.GameAudio.Instance?.SetBoatEngineTemporarilyMuted(true);
             if (boat != null)
             {
                 Rigidbody body = boat.GetComponent<Rigidbody>();
@@ -156,6 +149,7 @@ namespace GameJamOcean.Progression
         {
             if (!isOpen) return;
             isOpen = false;
+            GameJamOcean.Audio.GameAudio.Instance?.SetBoatEngineTemporarilyMuted(false);
             if (modal != null) modal.SetActive(false);
             Time.timeScale = previousTimeScale;
             Cursor.lockState = previousCursorLock;
@@ -205,6 +199,11 @@ namespace GameJamOcean.Progression
             UpgradeKind kind = VisibleUpgrades[index];
             bool completedBefore = progress.IsGameCompleted;
             bool purchased = progress.TryPurchase(kind, offeredLevels[index], out string message);
+            if (purchased && kind == UpgradeKind.Island)
+                GameJamOcean.Audio.GameAudio.Instance?.PlayVillageConstruction();
+            if (purchased && kind == UpgradeKind.BoatHull && boat != null
+                && boat.TryGetComponent(out BoatStats3D boatStats))
+                boatStats.SelectBoat(progress.GetLevel(UpgradeKind.BoatHull));
             int villageLevel = progress.GetLevel(UpgradeKind.Island);
             statusLabel.text = purchased && kind == UpgradeKind.Island
                 ? VillageThanks[Mathf.Clamp(villageLevel, 1, 4)]
@@ -242,17 +241,19 @@ namespace GameJamOcean.Progression
                 var definition = progress.Catalog != null ? progress.Catalog.Find(kind) : null;
                 if (!valid || definition == null)
                 {
-                    labels[i].text = kind.ToString();
+                    upgradeNames[i].text = kind.ToString();
+                    labels[i].text = "";
                     prices[i].text = "Indisponível";
                     buttons[i].interactable = false;
                     continue;
                 }
                 bool maximum = level >= definition.MaximumLevel;
                 var next = definition.Tier(Mathf.Min(definition.MaximumLevel, level + 1));
+                upgradeNames[i].text = firstPierUpgrade && kind == UpgradeKind.Island
+                    ? "PIER" : $"{definition.displayName}  |  N{level}";
                 labels[i].text = firstPierUpgrade && kind == UpgradeKind.Island
-                    ? "PIER\nO primeiro passo para melhorar o comércio marítimo; o próximo será nosso farol!"
-                    : $"{definition.displayName}  |  N{level}" +
-                    (maximum ? "\nNível máximo" : $"\nN{level + 1}: {Describe(definition.kind, next, level + 1)}");
+                    ? "O primeiro passo para melhorar o comércio marítimo; o próximo será nosso farol!"
+                    : maximum ? "Nível máximo" : $"N{level + 1}: {Describe(definition.kind, next, level + 1)}";
                 prices[i].text = maximum ? "MÁXIMO" : $"{next.goldCost} OURO\nCOMPRAR";
                 buttons[i].interactable = !maximum && progress.TotalGold >= next.goldCost;
                 if (kind == UpgradeKind.Island && (villageLevel1 == null || villageLevel2 == null || villageLevel3 == null || villageLevel4 == null)) buttons[i].interactable = false;
@@ -291,36 +292,42 @@ namespace GameJamOcean.Progression
             shade.anchorMin = Vector2.zero; shade.anchorMax = Vector2.one;
             shade.offsetMin = shade.offsetMax = Vector2.zero;
             shade.gameObject.AddComponent<Image>().color = new Color(0, 0, 0, 0.16f);
-            RectTransform panel = Rect("Port Upgrades", modal.transform, new Vector2(900, 800), Vector2.zero);
-            panel.anchorMin = panel.anchorMax = panel.pivot = new Vector2(0.5f, 0.5f);
-            panel.gameObject.AddComponent<Image>().color = new Color(0.025f, 0.10f, 0.14f, .72f);
-            Label("Title", panel, new Vector2(700, 40), new Vector2(-45, -22), "UPGRADES DO PORTO", 30);
-            goldLabel = Label("Gold", panel, new Vector2(800, 35), new Vector2(0, -75), "OURO", 24);
-            Button close = ButtonUI("Close", panel, new Vector2(90, 40), new Vector2(380, -22), out TMP_Text closeText);
+            RectTransform panel = GameJamOcean.UI.EditableUIFactory.CreatePanel(
+                GameJamOcean.UI.EditableUIPanelKind.UpgradePanel, modal.transform,
+                new Vector2(900, 800), new Color(0.025f, 0.10f, 0.14f, .72f),
+                "Port Upgrades", out RectTransform content);
+            TMP_Text title = Label("Title", content, new Vector2(700, 40), new Vector2(-45, -22), "UPGRADES DO PORTO", 30);
+            GameJamOcean.UI.GameFontStyles.Apply(title, GameJamOcean.UI.GameFontRole.Display);
+            goldLabel = Label("Gold", content, new Vector2(800, 35), new Vector2(0, -75), "OURO", 24);
+            GameJamOcean.UI.GameFontStyles.Apply(goldLabel, GameJamOcean.UI.GameFontRole.Display);
+            Button close = ButtonUI("Close", content, new Vector2(90, 40), new Vector2(380, -22), out TMP_Text closeText);
             closeText.text = "FECHAR";
             close.onClick.AddListener(Close);
             for (int i = 0; i < VisibleUpgrades.Length; i++)
             {
-                RectTransform row = Rect($"Upgrade {i}", panel, new Vector2(830, 65), new Vector2(0, -130 - i * 75));
+                RectTransform row = Rect($"Upgrade {i}", content, new Vector2(830, 65), new Vector2(0, -130 - i * 75));
                 rows[i] = row.gameObject;
                 row.gameObject.AddComponent<Image>().color = new Color(0.06f, 0.19f, 0.23f, 1);
-                labels[i] = Label("Description", row, new Vector2(600, 60), new Vector2(-105, -2), "", 20);
+                upgradeNames[i] = Label("Upgrade Name", row, new Vector2(600, 25), new Vector2(-105, 0), "", 18);
+                upgradeNames[i].alignment = TextAlignmentOptions.MidlineLeft;
+                GameJamOcean.UI.GameFontStyles.Apply(upgradeNames[i], GameJamOcean.UI.GameFontRole.Display);
+                labels[i] = Label("Description", row, new Vector2(600, 35), new Vector2(-105, -25), "", 16);
                 labels[i].alignment = TextAlignmentOptions.MidlineLeft;
                 buttons[i] = ButtonUI("Buy", row, new Vector2(180, 55), new Vector2(310, -5), out prices[i]);
                 int index = i;
                 buttons[i].onClick.AddListener(() => Buy(index));
             }
-            repairButton = ButtonUI("Repair Boat", panel, new Vector2(650, 55), new Vector2(0, -520), out repairPrice);
+            repairButton = ButtonUI("Repair Boat", content, new Vector2(650, 55), new Vector2(0, -520), out repairPrice);
             repairButton.onClick.AddListener(RepairBoat);
-            statusLabel = Label("Status", panel, new Vector2(820, 90), new Vector2(0, -600), "", 21);
+            statusLabel = Label("Status", content, new Vector2(820, 90), new Vector2(0, -600), "", 21);
             for (int level = 1; level <= 3; level++)
             {
                 int capturedLevel = level;
-                boatButtons[level - 1] = ButtonUI($"Boat {level}", panel, new Vector2(130, 72),
+                boatButtons[level - 1] = ButtonUI($"Boat {level}", content, new Vector2(130, 72),
                     new Vector2(-245 + (level - 1) * 145, -700), out TMP_Text boatText);
                 boatText.text = $"BOAT {level}";
                 boatText.rectTransform.sizeDelta = new Vector2(125, 24);
-                boatText.rectTransform.anchoredPosition = new Vector2(0, -21);
+                boatText.rectTransform.anchoredPosition = new Vector2(0, -27);
                 Image boatIcon = Rect("Boat Icon", boatButtons[level - 1].transform,
                     new Vector2(72, 38), new Vector2(0, -5)).gameObject.AddComponent<Image>();
                 boatIcon.sprite = CreateBoatIconSprite(level);
@@ -328,10 +335,6 @@ namespace GameJamOcean.Progression
                 boatIcon.raycastTarget = false;
                 boatButtons[level - 1].onClick.AddListener(() => SelectBoat(capturedLevel));
             }
-            colorButton = ButtonUI("Boat Colors", panel, new Vector2(210, 72), new Vector2(275, -700), out TMP_Text colorsText);
-            colorsText.text = "PERSONALIZAR\nCORES";
-            colorButton.onClick.AddListener(OpenColorPanel);
-            BuildColorPanel();
             modal.SetActive(false);
         }
 
@@ -347,110 +350,12 @@ namespace GameJamOcean.Progression
                 if (available) boatButtons[i].GetComponent<Image>().color = i + 1 == selected
                     ? new Color(.9f, .68f, .12f) : new Color(.15f, .48f, .5f);
             }
-            if (colorButton != null) colorButton.gameObject.SetActive(!hide);
         }
 
         private void SelectBoat(int level)
         {
             BoatStats3D stats = boat != null ? boat.GetComponent<BoatStats3D>() : null;
             if (stats != null) stats.SelectBoat(level);
-            Refresh();
-        }
-
-        private void BuildColorPanel()
-        {
-            RectTransform root = Rect("Boat Color Panel", modal.transform, new Vector2(680, 500), Vector2.zero);
-            root.anchorMin = root.anchorMax = root.pivot = Vector2.one * .5f;
-            root.gameObject.AddComponent<Image>().color = new Color(.02f, .09f, .14f, .98f);
-            colorPanel = root.gameObject;
-            Label("CORES DO BARCO", root, new Vector2(600, 45), new Vector2(0, -25), "CORES DO BARCO", 28);
-            for (int slot = 0; slot < 3; slot++)
-            {
-                int captured = slot;
-                Button button = ButtonUI($"Cor {slot + 1}", root, new Vector2(150, 70),
-                    new Vector2(-170 + slot * 170, -95), out TMP_Text label);
-                label.text = $"COR {slot + 1}";
-                colorSamples[slot] = button.GetComponent<Image>();
-                button.onClick.AddListener(() => selectedColorSlot = captured);
-            }
-            Color[] palette = { Color.red, new Color(.1f, .45f, 1f), new Color(.15f, .8f, .3f),
-                Color.yellow, Color.white, new Color(.25f, .25f, .25f), Color.black };
-            for (int i = 0; i < palette.Length; i++)
-            {
-                Color choice = palette[i];
-                Button swatch = ButtonUI($"Paleta {i + 1}", root, new Vector2(64, 64),
-                    new Vector2(-225 + i * 75, -205), out TMP_Text swatchText);
-                swatchText.text = "";
-                swatch.GetComponent<Image>().color = choice;
-                swatch.onClick.AddListener(() => ChooseColor(choice));
-            }
-            colorCostLabel = Label("Color Cost", root, new Vector2(500, 40), new Vector2(0, -290),
-                "Custo total: 0 Gold", 23);
-            Button apply = ButtonUI("Apply Colors", root, new Vector2(180, 55), new Vector2(-205, -370), out TMP_Text applyText);
-            applyText.text = "APLICAR"; apply.onClick.AddListener(ApplyColors);
-            Button cancel = ButtonUI("Cancel Colors", root, new Vector2(180, 55), new Vector2(0, -370), out TMP_Text cancelText);
-            cancelText.text = "CANCELAR"; cancel.onClick.AddListener(() => colorPanel.SetActive(false));
-            Button reset = ButtonUI("Reset Colors", root, new Vector2(180, 55), new Vector2(205, -370), out TMP_Text resetText);
-            resetText.text = "RESET GRÁTIS"; reset.onClick.AddListener(ResetColors);
-            colorPanel.SetActive(false);
-        }
-
-        private void OpenColorPanel()
-        {
-            BoatVisualUpgrade3D visual = boat != null ? boat.GetComponent<BoatVisualUpgrade3D>() : null;
-            if (visual == null) return;
-            int level = progress.SelectedBoatLevel;
-            for (int slot = 0; slot < 3; slot++)
-            {
-                initialColors[slot] = pendingColors[slot] = visual.GetDisplayedColor(slot);
-                pendingCustomized[slot] = progress.HasCustomizedBoatColor(level, slot);
-                colorSamples[slot].color = pendingColors[slot];
-            }
-            selectedColorSlot = 0;
-            UpdateColorCost();
-            colorPanel.SetActive(true);
-            colorPanel.transform.SetAsLastSibling();
-        }
-
-        private void ChooseColor(Color color)
-        {
-            pendingColors[selectedColorSlot] = color;
-            pendingCustomized[selectedColorSlot] = true;
-            colorSamples[selectedColorSlot].color = color;
-            UpdateColorCost();
-        }
-
-        private int ChangedColorCount()
-        {
-            int count = 0;
-            for (int slot = 0; slot < 3; slot++)
-                if (Vector4.SqrMagnitude((Vector4)(pendingColors[slot] - initialColors[slot])) > .0001f) count++;
-            return count;
-        }
-
-        private void UpdateColorCost()
-        {
-            if (colorCostLabel != null) colorCostLabel.text = $"Custo total: {ChangedColorCount() * ColorPrice} Gold";
-        }
-
-        private void ApplyColors()
-        {
-            if (!progress.TryApplyBoatColors(progress.SelectedBoatLevel, pendingColors, pendingCustomized,
-                    ChangedColorCount(), ColorPrice, out int cost))
-            {
-                colorCostLabel.text = $"Gold insuficiente — custo total: {cost} Gold";
-                return;
-            }
-            colorPanel.SetActive(false);
-            statusLabel.text = $"Cores aplicadas por {cost} Gold.";
-            Refresh();
-        }
-
-        private void ResetColors()
-        {
-            progress.ResetBoatColors(progress.SelectedBoatLevel);
-            colorPanel.SetActive(false);
-            statusLabel.text = "Cores originais restauradas gratuitamente.";
             Refresh();
         }
 
@@ -467,7 +372,9 @@ namespace GameJamOcean.Progression
         private static TMP_Text Label(string name, Transform parent, Vector2 size, Vector2 position, string text, float fontSize)
         {
             var label = Rect(name, parent, size, position).gameObject.AddComponent<TextMeshProUGUI>();
+            GameJamOcean.UI.GameFontStyles.Apply(label, GameJamOcean.UI.GameFontRole.General);
             label.text = text; label.fontSize = fontSize; label.color = Color.white;
+            label.enableAutoSizing = true; label.fontSizeMin = Mathf.Max(10f, fontSize * .72f); label.fontSizeMax = fontSize;
             label.alignment = TextAlignmentOptions.Center;
             label.raycastTarget = false;
             return label;
@@ -475,10 +382,16 @@ namespace GameJamOcean.Progression
 
         private static Button ButtonUI(string name, Transform parent, Vector2 size, Vector2 position, out TMP_Text text)
         {
-            RectTransform rect = Rect(name, parent, size, position);
-            Image image = rect.gameObject.AddComponent<Image>(); image.color = new Color(0.15f, 0.48f, 0.50f, 1);
-            Button button = rect.gameObject.AddComponent<Button>(); button.targetGraphic = image;
-            text = Label("Label", rect, size, Vector2.zero, "", 18);
+            Button button = GameJamOcean.UI.EditableUIFactory.CreateButton(name, parent, size,
+                position, out text, new Color(0.15f, 0.48f, 0.50f, 1));
+            GameJamOcean.UI.GameFontStyles.Apply(text, GameJamOcean.UI.GameFontRole.General);
+            text.fontSize = 18;
+            text.enableAutoSizing = true;
+            text.fontSizeMin = 12;
+            text.fontSizeMax = 18;
+            text.alignment = TextAlignmentOptions.Center;
+            text.color = Color.white;
+            text.raycastTarget = false;
             return button;
         }
 

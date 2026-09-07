@@ -37,11 +37,13 @@ namespace GameJamOcean.Enemies
         [SerializeField, Min(1f)] private float distantSpeedMultiplier = 1.65f;
         [SerializeField, Range(0f, 1f)] private float finalWaveThreshold = .85f;
         [SerializeField, Min(1f)] private float finalWaveSpeedMultiplier = 1.3f;
-        [Header("Isolation Pressure Dash")]
-        [SerializeField, Min(1f)] private float isolationDistance = 10f;
+        [Header("Isolation Speed Pressure")]
+        [SerializeField, Min(1f)] private float isolationDistance = 7.5f;
         [SerializeField, Min(.1f)] private float isolationCheckInterval = 1f;
-        [SerializeField, Min(.1f)] private float isolationDashCooldown = 5f;
-        [SerializeField, Min(.1f)] private float isolationDashDuration = .55f;
+        [SerializeField, Min(.1f)] private float isolationSpeedBuffCooldown = 5f;
+        [SerializeField, Min(.1f)] private float isolationSpeedBuffDuration = 4f;
+        [SerializeField, Min(1f)] private float isolationSpeedMultiplier = 1.65f;
+        [SerializeField, Min(1)] private int isolationEnemyCount = 5;
         private static readonly List<EnemyController2D> ActiveEnemies = new();
         private static float nextIsolationCheck;
         private float weavePhase, weaveFrequency;
@@ -135,9 +137,7 @@ namespace GameJamOcean.Enemies
         private OctopusStrikePhase octopusStrikePhase;
         private float octopusStrikePhaseUntil, octopusNextLunge;
         private Vector2 octopusEscapeDirection;
-        private Vector2 isolationDashTarget;
-        private float isolationDashUntil;
-        private float isolationDashSpeed;
+        private float isolationSpeedBuffUntil;
 
         private void Awake()
         {
@@ -172,6 +172,7 @@ namespace GameJamOcean.Enemies
             octopusNextDash = Time.time + UnityEngine.Random.Range(.4f, 1.4f);
             octopusNextLunge = Time.time + UnityEngine.Random.Range(octopusLungeIntervalMin, octopusLungeIntervalMax);
             octopusStrikePhase = OctopusStrikePhase.Orbit;
+            isolationSpeedBuffUntil = 0f;
             if (speciesProfile == SpeciesProfile.AguaViva)
                 HarpoonLauncher2D.HarpoonFired += HandleHarpoonFired;
             enemyHealth.Damaged += HandleDamaged;
@@ -209,12 +210,7 @@ namespace GameJamOcean.Enemies
                 return;
             }
 
-            TryStartGroupIsolationDash((Vector2)target.position);
-            if (UpdateIsolationDash())
-            {
-                UpdateMovementAnimation();
-                return;
-            }
+            TryStartGroupIsolationSpeedBuff((Vector2)target.position);
 
             Vector2 displacement = (Vector2)target.position - enemyRigidbody.position;
             float distance = displacement.magnitude;
@@ -285,6 +281,8 @@ namespace GameJamOcean.Enemies
                 && sessionManager.KilledEnemies >= Mathf.CeilToInt(sessionManager.TotalEnemies * finalWaveThreshold))
                 currentAggression *= finalWaveSpeedMultiplier;
             speedMultiplier *= currentAggression;
+            if (Time.time < isolationSpeedBuffUntil)
+                speedMultiplier *= isolationSpeedMultiplier;
 
             Vector2 desired = Vector2.ClampMagnitude(pursuit + sideways + separation + special, 1f)
                 * movementSpeed * speedMultiplier;
@@ -304,7 +302,7 @@ namespace GameJamOcean.Enemies
             UpdateMovementAnimation();
         }
 
-        private void TryStartGroupIsolationDash(Vector2 playerPosition)
+        private void TryStartGroupIsolationSpeedBuff(Vector2 playerPosition)
         {
             if (Time.time < nextIsolationCheck) return;
             nextIsolationCheck = Time.time + isolationCheckInterval;
@@ -314,10 +312,12 @@ namespace GameJamOcean.Enemies
             var candidates = new List<EnemyController2D>(ActiveEnemies.Count);
             foreach (EnemyController2D enemy in ActiveEnemies)
             {
-                if (enemy == null || enemy.enemyHealth == null || enemy.enemyHealth.IsDead) continue;
+                if (enemy == null || !enemy.isActiveAndEnabled || enemy.enemyHealth == null
+                    || enemy.enemyHealth.IsDead || enemy.enemyRigidbody == null
+                    || !enemy.enemyRigidbody.simulated || enemy.movementSpeed <= 0f) continue;
                 center += enemy.enemyRigidbody.position;
                 aliveCount++;
-                if (Time.time >= enemy.isolationDashUntil) candidates.Add(enemy);
+                if (Time.time >= enemy.isolationSpeedBuffUntil) candidates.Add(enemy);
             }
             if (aliveCount == 0 || Vector2.Distance(playerPosition, center / aliveCount) < isolationDistance)
                 return;
@@ -327,46 +327,20 @@ namespace GameJamOcean.Enemies
                 int tier = left.SpeciesTier.CompareTo(right.SpeciesTier);
                 return tier != 0 ? tier : left.GetInstanceID().CompareTo(right.GetInstanceID());
             });
-            int count = Mathf.Min(3, candidates.Count);
+            int count = Mathf.Min(Mathf.Max(1, isolationEnemyCount), candidates.Count);
             for (int index = 0; index < count; index++)
-                candidates[index].BeginIsolationDash(playerPosition);
-            nextIsolationCheck = Time.time + isolationDashCooldown;
+                candidates[index].BeginIsolationSpeedBuff(isolationSpeedBuffDuration);
+            nextIsolationCheck = Time.time + isolationSpeedBuffCooldown;
         }
 
         private int SpeciesTier => speciesProfile == SpeciesProfile.Standard
             ? int.MaxValue : (int)speciesProfile;
 
-        private void BeginIsolationDash(Vector2 playerPosition)
+        private void BeginIsolationSpeedBuff(float duration)
         {
-            Vector2 start = enemyRigidbody.position;
-            isolationDashTarget = Vector2.Lerp(start, playerPosition, .5f);
-            float distance = Vector2.Distance(start, isolationDashTarget);
-            isolationDashSpeed = distance / Mathf.Max(.1f, isolationDashDuration);
-            isolationDashUntil = Time.time + isolationDashDuration;
-        }
-
-        private bool UpdateIsolationDash()
-        {
-            if (Time.time >= isolationDashUntil) return false;
-            Vector2 remaining = isolationDashTarget - enemyRigidbody.position;
-            if (remaining.sqrMagnitude <= .0025f)
-            {
-                isolationDashUntil = 0f;
-                enemyRigidbody.linearVelocity = Vector2.zero;
-                return false;
-            }
-            Vector2 velocity = remaining.normalized * isolationDashSpeed;
-            if (velocity.magnitude * Time.fixedDeltaTime > remaining.magnitude)
-                velocity = remaining / Time.fixedDeltaTime;
-            if (movementBounds != null)
-            {
-                Vector2 next = movementBounds.ClampPoint(
-                    enemyRigidbody.position + velocity * Time.fixedDeltaTime, Vector2.one * .2f);
-                velocity = (next - enemyRigidbody.position) / Time.fixedDeltaTime;
-            }
-            enemyRigidbody.linearVelocity = velocity;
-            UpdateVisualDirection(velocity.x);
-            return true;
+            // The normal AI keeps steering. Only its final speed is temporarily multiplied.
+            isolationSpeedBuffUntil = Mathf.Max(isolationSpeedBuffUntil,
+                Time.time + Mathf.Max(.1f, duration));
         }
 
         private void TryAttack()
@@ -716,6 +690,12 @@ namespace GameJamOcean.Enemies
             hurtAnimationDuration = Mathf.Max(0f, hurtAnimationDuration);
             projectileReleaseDelay = Mathf.Max(0f, projectileReleaseDelay);
             destroyDelay = Mathf.Max(0f, destroyDelay);
+            isolationDistance = Mathf.Max(1f, isolationDistance);
+            isolationCheckInterval = Mathf.Max(.1f, isolationCheckInterval);
+            isolationSpeedBuffCooldown = Mathf.Max(.1f, isolationSpeedBuffCooldown);
+            isolationSpeedBuffDuration = Mathf.Max(.1f, isolationSpeedBuffDuration);
+            isolationSpeedMultiplier = Mathf.Max(1f, isolationSpeedMultiplier);
+            isolationEnemyCount = Mathf.Max(1, isolationEnemyCount);
 
             CacheAnimationHashes();
         }

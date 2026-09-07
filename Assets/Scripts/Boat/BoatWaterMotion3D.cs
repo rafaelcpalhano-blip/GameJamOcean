@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 namespace GameJamOcean.Boat
@@ -28,28 +29,44 @@ namespace GameJamOcean.Boat
         private float impactSide = 1f;
         private BoatController3D controller;
         private float turboPitchBlend;
+        private Coroutine initialization;
 
         public void Configure(Transform model)
         {
             visualModel = model;
-            if (isActiveAndEnabled && visualModel != null)
-            {
-                restPosition = visualModel.localPosition;
-                restRotation = visualModel.localRotation;
-                hasRestPose = true;
-            }
+            if (isActiveAndEnabled) ScheduleInitialization();
         }
 
         private void OnEnable()
         {
-            if (visualModel == null || visualModel == transform
-                || !visualModel.IsChildOf(transform)
+            // BoatVisualUpgrade3D creates and assigns the visual holder after scene load.
+            // Until then there is nothing to animate, but this is a valid initialization state.
+            hasRestPose = false;
+            if (visualModel != null) ScheduleInitialization();
+        }
+
+        private void ScheduleInitialization()
+        {
+            if (initialization != null) StopCoroutine(initialization);
+            hasRestPose = false;
+            initialization = StartCoroutine(InitializeAfterVisualSetup());
+        }
+
+        private IEnumerator InitializeAfterVisualSetup()
+        {
+            // Instantiated prefab colliders are removed with Destroy, which completes at frame end.
+            yield return null;
+            initialization = null;
+
+            if (visualModel == null) yield break;
+
+            if (visualModel == transform || !visualModel.IsChildOf(transform)
                 || visualModel.GetComponentInChildren<Collider>(true) != null
                 || visualModel.GetComponentInChildren<Rigidbody>(true) != null)
             {
                 Debug.LogWarning("Boat water motion needs a visual child without physics components.", this);
                 enabled = false;
-                return;
+                yield break;
             }
 
             restPosition = visualModel.localPosition;
@@ -90,6 +107,11 @@ namespace GameJamOcean.Boat
 
         private void OnDisable()
         {
+            if (initialization != null)
+            {
+                StopCoroutine(initialization);
+                initialization = null;
+            }
             if (hasRestPose && visualModel != null)
             {
                 visualModel.SetLocalPositionAndRotation(restPosition, restRotation);

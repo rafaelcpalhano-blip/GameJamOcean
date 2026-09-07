@@ -53,6 +53,8 @@ namespace GameJamOcean.UI
         private CursorLockMode savedCursorLock;
         private Canvas canvas;
         private RectTransform panel;
+        private RectTransform panelContent;
+        private EditableUIPanelKind? activePanelKind;
         private readonly List<Canvas> hiddenCanvases = new();
         private Rigidbody menuBoat;
         private bool boatWasKinematic;
@@ -117,6 +119,15 @@ namespace GameJamOcean.UI
                 Freeze(false);
                 ShowControlsTutorial(false);
             }
+            StartCoroutine(ApplyFontsAfterUiCreation());
+        }
+
+        private static IEnumerator ApplyFontsAfterUiCreation()
+        {
+            // Scene UI and runtime panels finish their Start methods on the next frame.
+            yield return null;
+            yield return null;
+            GameFontStyles.ApplyLoadedTexts();
         }
 
         private void Update()
@@ -173,6 +184,7 @@ namespace GameJamOcean.UI
             {
                 Time.timeScale = 0f;
                 AudioListener.pause = true;
+                gameAudio.SetDivePauseAmbience(SceneManager.GetActiveScene().name == "DiveScene");
             }
             else
             {
@@ -207,6 +219,7 @@ namespace GameJamOcean.UI
                 menuBoat = null;
             }
             open = false;
+            gameAudio.SetDivePauseAmbience(false);
             resumeFrame = Time.frameCount;
             Time.timeScale = savedTimeScale;
             AudioListener.pause = savedAudioPause;
@@ -232,8 +245,7 @@ namespace GameJamOcean.UI
             GameProgress.Instance.SaveProgress();
             showingLetter = true;
             letterFrame = Time.frameCount;
-            ClearPanel("UMA NOVA VIDA");
-            panel.GetComponent<Image>().color = new Color(.02f, .09f, .14f, .9f);
+            ClearPanel("UMA NOVA VIDA", EditableUIPanelKind.TutorialPanel);
             TMP_Text body = Label("<b>Um bom lugar para começar uma vida de mergulhador profissional, não acha?</b>\n\n"
                 + "Dizem que tesouros e riquezas esquecidas aguardam nas profundezas.\n"
                 + "Quanto mais você conquistar, mais poderá melhorar suas instalações, seu transporte e seus equipamentos. "
@@ -251,8 +263,7 @@ namespace GameJamOcean.UI
             instance.Freeze(false);
             instance.showingLetter = true;
             instance.letterFrame = Time.frameCount;
-            instance.ClearPanel("DE VOLTA AO ESTALEIRO");
-            instance.panel.GetComponent<Image>().color = new Color(.02f, .09f, .14f, .9f);
+            instance.ClearPanel("DE VOLTA AO ESTALEIRO", EditableUIPanelKind.TutorialPanel);
             string message = firstDeathFree
                 ? "Destruir o barco custa mais do que mantê-lo em boas condições, então procure deixar a manutenção em dia. Desta vez, como sua missão é nobre e ajuda o vilarejo a crescer, o primeiro conserto fica por conta da vila."
                 : $"{RescueMessages[UnityEngine.Random.Range(0, RescueMessages.Length)]}\n\nConserto após o naufrágio: {configuredCost} Gold. Valor debitado: {chargedGold} Gold.";
@@ -328,8 +339,8 @@ namespace GameJamOcean.UI
         {
             EnsureCanvas();
             canvas.gameObject.SetActive(true);
-            ClearPanel(ocean ? "CONTROLES DO BARCO" : "CONTROLES DO MERGULHO");
-            panel.GetComponent<Image>().color = new Color(.02f, .09f, .14f, .88f);
+            ClearPanel(ocean ? "CONTROLES DO BARCO" : "CONTROLES DO MERGULHO",
+                EditableUIPanelKind.TutorialPanel);
             string controls = ocean
                 ? "WASD / Setas — mover e virar\nShift — turbo\nF — interagir\nP — pausar\nBotão direito do mouse — movimentar a câmera"
                 : "WASD / Setas — nadar\nShift — dash\nClique esquerdo / segurar — atacar\nF — interagir\nP — pausar\n\nMuito cuidado com as profundezas do mar. Alguns bichos são mais hostis, outros são mais astutos, mas uma coisa é certa: estamos em perigo o tempo todo.";
@@ -348,7 +359,8 @@ namespace GameJamOcean.UI
         private void ShowHome()
         {
             if (main) gameAudio.EnsureAmbiencePlaying();
-            ClearPanel(main ? "GAME JAM OCEAN" : "PAUSADO");
+            ClearPanel(main ? "GAME JAM OCEAN" : "PAUSADO",
+                main ? EditableUIPanelKind.MainMenu : EditableUIPanelKind.PauseMenu);
             if (main)
             {
                 var progress = GameProgress.Instance;
@@ -453,42 +465,53 @@ namespace GameJamOcean.UI
             dim.anchorMin = Vector2.zero; dim.anchorMax = Vector2.one;
             dim.offsetMin = dim.offsetMax = Vector2.zero;
             dim.gameObject.AddComponent<Image>().color = new Color(0, .03f, .07f, .06f);
-            panel = Rect("Menu", root.transform, new Vector2(570, 520), Vector2.zero);
-            panel.anchorMin = panel.anchorMax = panel.pivot = Vector2.one * .5f;
-            panel.gameObject.AddComponent<Image>().color = new Color(.02f, .09f, .14f, .24f);
+            SetPanelTemplate(main ? EditableUIPanelKind.MainMenu : EditableUIPanelKind.PauseMenu);
         }
 
-        private void ClearPanel(string title)
+        private void ClearPanel(string title, EditableUIPanelKind? requestedKind = null)
         {
-            panel.GetComponent<Image>().color = new Color(.02f, .09f, .14f, .24f);
-            foreach (Transform child in panel) { child.gameObject.SetActive(false); Destroy(child.gameObject); }
-            Label(title, -35, 30);
+            SetPanelTemplate(requestedKind ?? (main
+                ? EditableUIPanelKind.MainMenu : EditableUIPanelKind.PauseMenu));
+            foreach (Transform child in panelContent)
+            {
+                child.gameObject.SetActive(false);
+                Destroy(child.gameObject);
+            }
+            TMP_Text titleLabel = Label(title, -35, 30);
+            GameFontStyles.Apply(titleLabel, GameFontRole.Display);
             if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
         }
 
         private TMP_Text Label(string text, float y, int size, float height = 45)
         {
-            var label = Rect("Label", panel, new Vector2(520, height), new Vector2(0, y)).gameObject.AddComponent<TextMeshProUGUI>();
-            label.font = TMP_Settings.defaultFontAsset;
+            var label = Rect("Label", panelContent, new Vector2(520, height), new Vector2(0, y)).gameObject.AddComponent<TextMeshProUGUI>();
+            GameFontStyles.Apply(label, GameFontRole.General);
             label.text = text; label.fontSize = size; label.alignment = TextAlignmentOptions.Center;
+            label.enableAutoSizing = true; label.fontSizeMin = Mathf.Max(10f, size * .72f); label.fontSizeMax = size;
             label.color = Color.white; label.raycastTarget = false;
             return label;
         }
 
         private void Button(string title, float y, Action action)
         {
-            var rect = Rect(title, panel, new Vector2(440, 52), new Vector2(0, y));
-            var image = rect.gameObject.AddComponent<Image>(); image.color = new Color(.1f, .37f, .43f);
-            var button = rect.gameObject.AddComponent<Button>(); button.targetGraphic = image;
+            var button = EditableUIFactory.CreateButton(title, panelContent, new Vector2(440, 52),
+                new Vector2(0, y), out TMP_Text label, new Color(.1f, .37f, .43f));
             button.onClick.AddListener(() => { if (!loading) action(); });
-            var label = Label(title, y, 23, 52);
-            label.transform.SetParent(rect, true);
+            GameFontStyles.Apply(label, GameFontRole.General);
+            label.text = title;
+            label.fontSize = 23;
+            label.enableAutoSizing = true;
+            label.fontSizeMin = 16;
+            label.fontSizeMax = 23;
+            label.alignment = TextAlignmentOptions.Center;
+            label.color = Color.white;
+            label.raycastTarget = false;
         }
 
         private void SettingSlider(string title, float y, float min, float max, float value, Action<float> apply)
         {
             var label = Label($"{title}: {value * 100f:0}%", y, 23);
-            var root = Rect(title, panel, new Vector2(400, 32), new Vector2(0, y - 50));
+            var root = Rect(title, panelContent, new Vector2(400, 32), new Vector2(0, y - 50));
             root.gameObject.AddComponent<Image>().color = new Color(.04f, .2f, .25f);
             var slider = root.gameObject.AddComponent<Slider>();
             var handle = Rect("Handle", root, new Vector2(24, 0), Vector2.zero);
@@ -507,12 +530,74 @@ namespace GameJamOcean.UI
             return rect;
         }
 
+        private void SetPanelTemplate(EditableUIPanelKind kind)
+        {
+            if (panel != null && activePanelKind == kind && panelContent != null) return;
+            if (panel != null)
+            {
+                panel.gameObject.SetActive(false);
+                Destroy(panel.gameObject);
+            }
+            panel = EditableUIFactory.CreatePanel(kind, canvas.transform, new Vector2(570, 520),
+                new Color(.02f, .09f, .14f, .24f), kind.ToString(), out panelContent);
+            activePanelKind = kind;
+        }
+
         private void OnDestroy()
         {
             if (instance != this) return;
             SceneManager.sceneLoaded -= OnSceneLoaded;
             Resume();
             instance = null;
+        }
+    }
+
+    public enum GameFontRole { General, Display }
+
+    public static class GameFontStyles
+    {
+        private static TMP_FontAsset kanit;
+        private static TMP_FontAsset russoOne;
+
+        public static void Apply(TMP_Text text, GameFontRole role)
+        {
+            if (text == null) return;
+            TMP_FontAsset font = role == GameFontRole.Display ? RussoOne : Kanit;
+            if (font != null) text.font = font;
+        }
+
+        public static void ApplyLoadedTexts()
+        {
+            foreach (TMP_Text text in UnityEngine.Object.FindObjectsByType<TMP_Text>(
+                         FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (text == null) continue;
+                Apply(text, IsDisplayText(text) ? GameFontRole.Display : GameFontRole.General);
+            }
+        }
+
+        private static TMP_FontAsset Kanit => kanit ??= Create("Fonts/Kanit-SemiBold", "Kanit SemiBold");
+        private static TMP_FontAsset RussoOne => russoOne ??= Create("Fonts/RussoOne-Regular", "Russo One");
+
+        private static TMP_FontAsset Create(string resourcePath, string assetName)
+        {
+            Font source = Resources.Load<Font>(resourcePath);
+            if (source == null) return null;
+            TMP_FontAsset asset = TMP_FontAsset.CreateFontAsset(source);
+            asset.name = assetName;
+            return asset;
+        }
+
+        private static bool IsDisplayText(TMP_Text text)
+        {
+            if (text == null) return false;
+
+            string key = (text.name ?? string.Empty).ToUpperInvariant();
+            string content = (text.text ?? string.Empty).ToUpperInvariant();
+            return key.Contains("TITLE") || key.Contains("GOLD") || key.Contains("OURO")
+                || key.Contains("TOTAL") || key.Contains("PROGRESS") || key.Contains("REWARD")
+                || key.Contains("UPGRADE NAME") || content.Contains("MERGULHO CONCLUÍDO")
+                || content.Trim() == "100%";
         }
     }
 }

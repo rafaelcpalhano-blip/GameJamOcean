@@ -39,6 +39,17 @@ namespace GameJamOcean.Boat
         [SerializeField] private float currentTurboCharge;
         [SerializeField] private bool turboActive;
 
+        [Header("Scenery Impact Audio")]
+        [SerializeField, Min(0f)] private float collisionAudioMinimumSpeed = .5f;
+        [SerializeField, Min(0f)] private float collisionAudioCooldown = .4f;
+
+        [Header("Solid Collision Response")]
+        [Tooltip("Fraction of the incoming speed used for the short impact recoil.")]
+        [SerializeField, Range(0f, .5f)] private float collisionRecoil = .12f;
+        [SerializeField, Min(0f)] private float maximumCollisionRecoilSpeed = .45f;
+        [SerializeField, Range(0f, 1f)] private float collisionTangentialRetention = .9f;
+        [SerializeField, Min(0f)] private float collisionSlideAssistDuration = .35f;
+
         [Header("Model Orientation")]
         [SerializeField] private float modelForwardOffset;
 
@@ -53,6 +64,11 @@ namespace GameJamOcean.Boat
         private float lastTurboUseTime = float.NegativeInfinity;
         private Vector3 lastDrivenVelocity;
         private Quaternion lastDrivenRotation;
+        private float nextCollisionAudioTime;
+        private GameJamOcean.CameraSystem.CameraFollow3D cameraFollow;
+        private Vector3 collisionSlideNormal;
+        private float collisionSlideUntil;
+        private float nextCollisionResponseTime;
 
         public float MaximumSpeed => maximumSpeed;
         public Vector3 DockPosition { get; private set; }
@@ -86,6 +102,7 @@ namespace GameJamOcean.Boat
             DockPosition = transform.position;
             DockRotation = transform.rotation;
             boatRigidbody = GetComponent<Rigidbody>();
+            cameraFollow = FindFirstObjectByType<GameJamOcean.CameraSystem.CameraFollow3D>();
             ConfigureRigidbody();
             currentTurboCharge = turboCapacity;
             OceanReturnState3D.TryRestore(transform, boatRigidbody);
@@ -124,6 +141,9 @@ namespace GameJamOcean.Boat
             smoothedSteering = 0f;
             steeringVelocity = 0f;
             turboActive = false;
+            cameraFollow?.SetTurboMicroshake(false);
+            GameJamOcean.Audio.GameAudio.Instance?.StopBoatTurbo();
+            GameJamOcean.Audio.GameAudio.Instance?.SetBoatEngineState(false, false);
             if (boatRigidbody != null && !boatRigidbody.isKinematic)
             {
                 Vector3 velocity = boatRigidbody.linearVelocity;
@@ -152,7 +172,17 @@ namespace GameJamOcean.Boat
 
         private void Update()
         {
-            if (GameJamOcean.UI.GameMenus.BlocksGameplay) return;
+            if (GameJamOcean.UI.GameMenus.BlocksGameplay)
+            {
+                if (turboActive)
+                {
+                    turboActive = false;
+                    GameJamOcean.Audio.GameAudio.Instance?.StopBoatTurbo();
+                }
+                GameJamOcean.Audio.GameAudio.Instance?.SetBoatEngineState(false, false);
+                cameraFollow?.SetTurboMicroshake(false);
+                return;
+            }
             moveInput = moveAction.action.ReadValue<Vector2>();
             // Throttle and rudder are independent axes; W+D must not reduce engine power.
             Keyboard keyboard = Keyboard.current;
@@ -168,6 +198,8 @@ namespace GameJamOcean.Boat
             moveInput.x = Mathf.Clamp(moveInput.x, -1f, 1f);
             moveInput.y = Mathf.Clamp(moveInput.y, -1f, 1f);
             UpdateTurbo();
+            cameraFollow?.SetTurboMicroshake(turboActive);
+            GameJamOcean.Audio.GameAudio.Instance?.SetBoatEngineState(moveInput.y > .05f, turboActive);
         }
 
         private void FixedUpdate()
@@ -214,6 +246,12 @@ namespace GameJamOcean.Boat
 
             sidewaysVelocity *= Mathf.Exp(-lateralDrag * lateralGripMultiplier * deltaTime);
             horizontalVelocity = forward * forwardSpeed + sidewaysVelocity;
+            if (Time.time < collisionSlideUntil)
+            {
+                float velocityIntoSurface = Vector3.Dot(horizontalVelocity, collisionSlideNormal);
+                if (velocityIntoSurface < 0f)
+                    horizontalVelocity -= collisionSlideNormal * velocityIntoSurface;
+            }
 
             boatRigidbody.linearVelocity = new Vector3(
                 horizontalVelocity.x,
@@ -293,11 +331,21 @@ namespace GameJamOcean.Boat
             }
 
             bool wantsTurbo = turboPressed && hasMovementInput;
+            bool wasTurboActive = turboActive;
             turboActive = wantsTurbo && currentTurboCharge > 0f;
+            if (turboActive && !wasTurboActive)
+                GameJamOcean.Audio.GameAudio.Instance?.StartBoatTurbo();
+            else if (!turboActive && wasTurboActive)
+                GameJamOcean.Audio.GameAudio.Instance?.StopBoatTurbo();
             if (turboActive)
             {
                 currentTurboCharge = Mathf.Max(0f, currentTurboCharge - Time.deltaTime);
                 lastTurboUseTime = Time.time;
+                if (currentTurboCharge <= 0f)
+                {
+                    turboActive = false;
+                    GameJamOcean.Audio.GameAudio.Instance?.StopBoatTurbo();
+                }
                 return;
             }
 
@@ -312,6 +360,77 @@ namespace GameJamOcean.Boat
                     turboCapacity,
                     currentTurboCharge + turboRechargePerSecond * Time.deltaTime);
             }
+        }
+
+        private void OnCollisionEnter(Collision collision)
+        {
+            if (!IsIslandScenery(collision.transform)) return;
+            ResolveSolidCollision(collision);
+            if (Time.time < nextCollisionAudioTime
+                || collision.relativeVelocity.magnitude < collisionAudioMinimumSpeed) return;
+            nextCollisionAudioTime = Time.time + collisionAudioCooldown;
+            GameJamOcean.Audio.GameAudio.Instance?.PlayBoatCollision();
+            // Rocks already trigger this feedback through BoatDamageObstacle3D.
+            if (IsRock(collision.transform)) return;
+
+            Vector3 push = collision.contactCount > 0
+                ? collision.GetContact(0).normal : -collision.relativeVelocity.normalized;
+            push.y = 0f;
+            if (push.sqrMagnitude < .001f) push = -NavigationForward;
+            push.Normalize();
+            FindFirstObjectByType<GameJamOcean.CameraSystem.CameraFollow3D>()?.PlayCollisionImpact(push);
+            GetComponent<BoatWaterMotion3D>()?.PlayCollisionImpact(push);
+        }
+
+        private void ResolveSolidCollision(Collision collision)
+        {
+            if (boatRigidbody == null || boatRigidbody.isKinematic || collision.contactCount == 0
+                || Time.time < nextCollisionResponseTime) return;
+
+            Vector3 incoming = lastDrivenVelocity;
+            incoming.y = 0f;
+            Vector3 normal = collision.GetContact(0).normal;
+            normal.y = 0f;
+            if (normal.sqrMagnitude < .001f)
+                normal = transform.position - collision.transform.position;
+            normal.y = 0f;
+            if (normal.sqrMagnitude < .001f || incoming.sqrMagnitude < .001f) return;
+            normal.Normalize();
+            // Always orient the normal away from the surface relative to the incoming motion.
+            if (Vector3.Dot(incoming, normal) > 0f) normal = -normal;
+            float incomingNormalSpeed = Mathf.Max(0f, -Vector3.Dot(incoming, normal));
+            if (incomingNormalSpeed <= .01f) return;
+
+            Vector3 tangent = Vector3.ProjectOnPlane(incoming, normal)
+                * collisionTangentialRetention;
+            float recoilSpeed = Mathf.Min(maximumCollisionRecoilSpeed,
+                incomingNormalSpeed * collisionRecoil);
+            Vector3 resolved = tangent + normal * recoilSpeed;
+            float vertical = boatRigidbody.linearVelocity.y;
+            boatRigidbody.linearVelocity = new Vector3(resolved.x, vertical, resolved.z);
+            lastDrivenVelocity = boatRigidbody.linearVelocity;
+            collisionSlideNormal = normal;
+            collisionSlideUntil = Time.time + collisionSlideAssistDuration;
+            nextCollisionResponseTime = Time.time + .08f;
+        }
+
+        private static bool IsRock(Transform candidate)
+        {
+            for (Transform current = candidate; current != null; current = current.parent)
+                if (current.name.Contains("rock", System.StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
+        private static bool IsIslandScenery(Transform candidate)
+        {
+            for (Transform current = candidate; current != null; current = current.parent)
+            {
+                string objectName = current.name.ToLowerInvariant();
+                if (objectName.Contains("rock") || objectName.Contains("terrain")
+                    || objectName.Contains("mainisland") || objectName.Contains("aldeia")
+                    || objectName.Contains("pier")) return true;
+            }
+            return false;
         }
 
         private InputAction CreateFallbackTurboAction()
@@ -366,6 +485,10 @@ namespace GameJamOcean.Boat
             turboRechargePerSecond = Mathf.Max(0f, turboRechargePerSecond);
             turboRechargeDelay = Mathf.Max(0f, turboRechargeDelay);
             currentTurboCharge = Mathf.Clamp(currentTurboCharge, 0f, turboCapacity);
+            collisionRecoil = Mathf.Clamp(collisionRecoil, 0f, .5f);
+            maximumCollisionRecoilSpeed = Mathf.Max(0f, maximumCollisionRecoilSpeed);
+            collisionTangentialRetention = Mathf.Clamp01(collisionTangentialRetention);
+            collisionSlideAssistDuration = Mathf.Max(0f, collisionSlideAssistDuration);
         }
     }
 }

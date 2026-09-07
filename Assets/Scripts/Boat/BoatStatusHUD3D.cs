@@ -41,6 +41,8 @@ namespace GameJamOcean.Boat
 
         private void Update()
         {
+            // Keep the HUD authoritative even if a runtime subscription is rebuilt during a scene transition.
+            RefreshHealth();
             RefreshTurbo();
         }
 

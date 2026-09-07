@@ -93,10 +93,17 @@ namespace GameJamOcean.Boat
             if (hull == null || turbo == null) return;
             int vesselLevel = progress.GetLevel(UpgradeKind.BoatHull);
             float ratio = health.NormalizedHealth;
-            healthUpgradePercent = hull.Tier(vesselLevel).value;
-            turboCapacityUpgradePercent = turbo.Tier(vesselLevel).value;
-            ApplyStats();
-            health.Heal(Mathf.Max(0f, health.MaximumHealth * ratio - health.CurrentHealth));
+            bool wasSwitching = switchingBoat;
+            switchingBoat = true;
+            try
+            {
+                healthUpgradePercent = hull.Tier(vesselLevel).value;
+                turboCapacityUpgradePercent = turbo.Tier(vesselLevel).value;
+                ApplyStats();
+                health.SetCurrentHealth(health.MaximumHealth * ratio);
+            }
+            finally { switchingBoat = wasSwitching; }
+            if (!wasSwitching) SaveActiveBoatHealth(health);
         }
 
         private void OnDisable()
@@ -197,10 +204,13 @@ namespace GameJamOcean.Boat
             switchingBoat = true;
             try
             {
-                GameProgress.Instance.SetSavedBoatHealth(activeBoatLevel, health.CurrentHealth);
-                activeBoatLevel = level;
+                GameProgress.Instance.SetSavedBoatHealthState(activeBoatLevel,
+                    health.CurrentHealth, health.MaximumHealth);
                 if (!GameProgress.Instance.SelectBoat(level)) return false;
+                activeBoatLevel = GameProgress.Instance.SelectedBoatLevel;
                 RestoreSelectedBoatHealth();
+                GameJamOcean.Audio.GameAudio.Instance?.PlayBoatUpgrade();
+                GameJamOcean.Audio.GameAudio.Instance?.PlayBoatEngine(level);
                 return true;
             }
             finally { switchingBoat = false; }
@@ -211,15 +221,24 @@ namespace GameJamOcean.Boat
             if (!GameProgress.HasInstance) { health.Restore(); return; }
             activeBoatLevel = GameProgress.Instance.SelectedBoatLevel;
             float saved = GameProgress.Instance.GetSavedBoatHealth(activeBoatLevel);
+            float savedMaximum = GameProgress.Instance.GetSavedBoatMaximumHealth(activeBoatLevel);
             if (saved < 0f) health.Restore();
-            else health.SetCurrentHealth(Mathf.Min(saved, health.MaximumHealth));
-            GameProgress.Instance.SetSavedBoatHealth(activeBoatLevel, health.CurrentHealth);
+            else
+            {
+                float restored = savedMaximum > 0f
+                    ? health.MaximumHealth * Mathf.Clamp01(saved / savedMaximum)
+                    : Mathf.Min(saved, health.MaximumHealth);
+                health.SetCurrentHealth(restored);
+            }
+            GameProgress.Instance.SetSavedBoatHealthState(activeBoatLevel,
+                health.CurrentHealth, health.MaximumHealth);
         }
 
         private void SaveActiveBoatHealth(Health changedHealth)
         {
             if (!switchingBoat && GameProgress.HasInstance && changedHealth != null)
-                GameProgress.Instance.SetSavedBoatHealth(activeBoatLevel, changedHealth.CurrentHealth);
+                GameProgress.Instance.SetSavedBoatHealthState(activeBoatLevel,
+                    changedHealth.CurrentHealth, changedHealth.MaximumHealth);
         }
 
         private void OnBoatDestroyed(Health destroyedHealth, GameObject damageSource)

@@ -14,8 +14,7 @@ namespace GameJamOcean.Progression
         [SerializeField, Min(0)] private int boatDestructions;
         [SerializeField, Range(1, 3)] private int selectedBoatLevel = 1;
         [SerializeField] private float[] savedBoatHealth = { -1f, -1f, -1f };
-        [SerializeField] private Color[] savedBoatColors = new Color[9];
-        [SerializeField] private bool[] customizedBoatColors = new bool[9];
+        [SerializeField] private float[] savedBoatMaximumHealth = { -1f, -1f, -1f };
         [SerializeField] private UnityEvent onGameCompleted = new();
         private const string SaveKey = "GameJamOcean.Progress.v1";
         private const int NewGameGold = 100;
@@ -28,8 +27,7 @@ namespace GameJamOcean.Progression
             public int boatDeaths;
             public int selectedBoat;
             public float[] boatHealth;
-            public Color[] boatColors;
-            public bool[] customBoatColors;
+            public float[] boatMaximumHealth;
         }
 
         [Header("Events")]
@@ -43,7 +41,6 @@ namespace GameJamOcean.Progression
         public event Action UpgradesChanged;
         public event Action GameCompleted;
         public event Action<int> BoatSelectionChanged;
-        public event Action<int> BoatAppearanceChanged;
         public bool IsGameCompleted => GetLevel(UpgradeKind.Island) == 4;
         public UpgradeCatalog Catalog => upgradeCatalog;
 
@@ -120,8 +117,7 @@ namespace GameJamOcean.Progression
             boatDestructions = 0;
             selectedBoatLevel = 1;
             savedBoatHealth = new[] { -1f, -1f, -1f };
-            savedBoatColors = new Color[9];
-            customizedBoatColors = new bool[9];
+            savedBoatMaximumHealth = new[] { -1f, -1f, -1f };
             SaveProgress();
             UpgradesChanged?.Invoke();
             onTotalGoldChanged?.Invoke(totalGold);
@@ -175,50 +171,34 @@ namespace GameJamOcean.Progression
             SaveProgress();
         }
 
-        public bool HasCustomizedBoatColor(int level, int slot)
+        public float GetSavedBoatMaximumHealth(int level)
         {
             EnsureBoatData();
-            return customizedBoatColors[(Mathf.Clamp(level, 1, 3) - 1) * 3 + Mathf.Clamp(slot, 0, 2)];
+            return savedBoatMaximumHealth[Mathf.Clamp(level, 1, 3) - 1];
         }
 
-        public Color GetBoatColor(int level, int slot, Color fallback)
+        public void SetSavedBoatHealthState(int level, float currentHealth, float maximumHealth)
         {
             EnsureBoatData();
-            int index = (Mathf.Clamp(level, 1, 3) - 1) * 3 + Mathf.Clamp(slot, 0, 2);
-            return customizedBoatColors[index] ? savedBoatColors[index] : fallback;
-        }
-
-        public bool TryApplyBoatColors(int level, Color[] colors, bool[] customized, int changedCount,
-            int pricePerColor, out int totalCost)
-        {
-            EnsureBoatData();
-            totalCost = Mathf.Max(0, changedCount) * Mathf.Max(0, pricePerColor);
-            if (totalCost > 0 && !TrySpendGold(totalCost)) return false;
-            int start = (Mathf.Clamp(level, 1, 3) - 1) * 3;
-            for (int slot = 0; slot < 3; slot++)
-            {
-                savedBoatColors[start + slot] = colors[slot];
-                customizedBoatColors[start + slot] = customized[slot];
-            }
+            int index = Mathf.Clamp(level, 1, 3) - 1;
+            savedBoatMaximumHealth[index] = Mathf.Max(1f, maximumHealth);
+            savedBoatHealth[index] = Mathf.Clamp(currentHealth, 0f, savedBoatMaximumHealth[index]);
             SaveProgress();
-            BoatAppearanceChanged?.Invoke(level);
-            return true;
-        }
-
-        public void ResetBoatColors(int level)
-        {
-            EnsureBoatData();
-            int start = (Mathf.Clamp(level, 1, 3) - 1) * 3;
-            for (int slot = 0; slot < 3; slot++) customizedBoatColors[start + slot] = false;
-            SaveProgress();
-            BoatAppearanceChanged?.Invoke(level);
         }
 
         private void EnsureBoatData()
         {
-            if (savedBoatHealth == null || savedBoatHealth.Length != 3) savedBoatHealth = new[] { -1f, -1f, -1f };
-            if (savedBoatColors == null || savedBoatColors.Length != 9) savedBoatColors = new Color[9];
-            if (customizedBoatColors == null || customizedBoatColors.Length != 9) customizedBoatColors = new bool[9];
+            savedBoatHealth = EnsureThreeEntries(savedBoatHealth);
+            savedBoatMaximumHealth = EnsureThreeEntries(savedBoatMaximumHealth);
+        }
+
+        private static float[] EnsureThreeEntries(float[] source)
+        {
+            if (source != null && source.Length == 3) return source;
+            float[] result = { -1f, -1f, -1f };
+            if (source != null)
+                for (int i = 0; i < Mathf.Min(source.Length, result.Length); i++) result[i] = source[i];
+            return result;
         }
 
         public bool TryPurchase(UpgradeKind kind, int expectedLevel, out string message)
@@ -241,7 +221,14 @@ namespace GameJamOcean.Progression
                 pendingGoldDelta -= spent;
                 upgradeLevels[(int)kind] = level;
                 if (kind == UpgradeKind.BoatHull)
+                {
                     upgradeLevels[(int)UpgradeKind.BoatTurbo] = level;
+                    EnsureBoatData();
+                    // A newly unlocked hull must never inherit stale health from another boat or an older save.
+                    int newBoatIndex = Mathf.Clamp(level, 1, 3) - 1;
+                    savedBoatHealth[newBoatIndex] = -1f;
+                    savedBoatMaximumHealth[newBoatIndex] = -1f;
+                }
                 SaveProgress();
                 UpgradesChanged?.Invoke();
                 onTotalGoldChanged?.Invoke(totalGold);
@@ -262,7 +249,7 @@ namespace GameJamOcean.Progression
             PlayerPrefs.SetString(SaveKey, JsonUtility.ToJson(new SaveData
                 { gold = totalGold, levels = upgradeLevels, boatDeaths = boatDestructions,
                     selectedBoat = selectedBoatLevel, boatHealth = savedBoatHealth,
-                    boatColors = savedBoatColors, customBoatColors = customizedBoatColors }));
+                    boatMaximumHealth = savedBoatMaximumHealth }));
             PlayerPrefs.Save();
         }
 
@@ -279,8 +266,7 @@ namespace GameJamOcean.Progression
                 boatDestructions = Mathf.Max(0, saved.boatDeaths);
                 selectedBoatLevel = Mathf.Clamp(saved.selectedBoat <= 0 ? 1 : saved.selectedBoat, 1, 3);
                 savedBoatHealth = saved.boatHealth;
-                savedBoatColors = saved.boatColors;
-                customizedBoatColors = saved.customBoatColors;
+                savedBoatMaximumHealth = saved.boatMaximumHealth;
                 EnsureBoatData();
                 if (saved.levels != null) for (int i = 0; i < Math.Min(6, saved.levels.Length); i++)
                     upgradeLevels[i] = Mathf.Clamp(saved.levels[i], i == 0 ? 0 : 1,

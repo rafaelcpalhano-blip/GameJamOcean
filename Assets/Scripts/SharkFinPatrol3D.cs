@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using GameJamOcean.Boat;
@@ -23,7 +24,7 @@ namespace GameJamOcean.World
         [SerializeField, Min(1f)] private float pursuitRadius = 12f;
         [SerializeField, Min(1f)] private float chargeTurnSpeed = 90f;
         [SerializeField, Min(.1f)] private float chargeSpeed = 6f;
-        [SerializeField, Min(.1f)] private float chargeDuration = 5f;
+        [SerializeField, Min(.1f)] private float chargeDuration = 5.5f;
         [SerializeField, Min(0f)] private float impactPushSpeed = 1.5f;
         [SerializeField, Min(.1f)] private float attackCooldown = 6f;
         [SerializeField, Range(0, 100)] private float damagePercent = 30f;
@@ -41,10 +42,14 @@ namespace GameJamOcean.World
         [Header("Physical collision")]
         [SerializeField, Min(.1f)] private float bodyMass = 2f;
         [SerializeField, Min(.05f)] private float aimDuration = .25f;
+        [SerializeField, Min(.1f)] private float cargoBoatSlideDuration = .65f;
+        [SerializeField, Min(.1f)] private float cargoBoatSlideSpeed = 5.5f;
         [Header("Appearance")]
         [SerializeField] private Color finColor = new Color(.3f, .34f, .38f, 1f);
         private BoatWaterBounds3D water;
         private GameJamOcean.Spawning.DiveSpawnExclusionCircle3D[] exclusions;
+        private float forcedSlideUntil;
+        private Vector3 forcedSlideDirection;
 
         public static void ConfigureScene(Scene scene)
         {
@@ -154,6 +159,14 @@ namespace GameJamOcean.World
             if (sharkBody == null || patrolPoints == null || patrolPoints.Length != 4) return;
             float dt = Time.fixedDeltaTime;
             Vector3 position = sharkBody.position;
+            if (Time.time < forcedSlideUntil)
+            {
+                Vector3 targetVelocity = forcedSlideDirection * cargoBoatSlideSpeed;
+                targetVelocity.y = Mathf.Clamp((home.y - position.y) / dt, -depthSpeed, depthSpeed);
+                sharkBody.linearVelocity = Vector3.Lerp(sharkBody.linearVelocity, targetVelocity,
+                    1f - Mathf.Exp(-8f * dt));
+                return;
+            }
             if (Time.time < recoveryUntil)
             {
                 // Preserve the solver's horizontal response without continuing to rise after surfacing.
@@ -162,7 +175,8 @@ namespace GameJamOcean.World
                 sharkBody.linearVelocity = recoveryVelocity;
                 return;
             }
-            bool canAttack = !GameJamOcean.UI.GameMenus.BlocksGameplay && health != null && !health.IsDead;
+            bool canAttack = !GameJamOcean.UI.GameMenus.BlocksGameplay && boat != null
+                && boat.isActiveAndEnabled && health != null && !health.IsDead;
             if (!charging && canAttack && Time.time >= nextAttack
                 && Flat(boat.transform.position - position).sqrMagnitude <= detectionRange * detectionRange
                 && Allowed(boat.transform.position, true))
@@ -240,7 +254,8 @@ namespace GameJamOcean.World
                 if (charging) { charging = false; recoveryUntil = Time.time + .5f; ChoosePoint(); }
                 return;
             }
-            if (GameJamOcean.UI.GameMenus.BlocksGameplay || health == null || health.IsDead
+            if (GameJamOcean.UI.GameMenus.BlocksGameplay || boat == null || !boat.isActiveAndEnabled
+                || health == null || health.IsDead
                 || Time.time < nextContactDamageTime) return;
             charging = false;
             recoveryUntil = Time.time + .5f;
@@ -267,14 +282,25 @@ namespace GameJamOcean.World
                 boat.RejectCollisionRecoil();
                 Vector3 boatRight = Vector3.Cross(Vector3.up, boatForward).normalized;
                 float sideSign = Vector3.Dot(boatToShark, boatRight) >= 0f ? 1f : -1f;
-                sharkBody.AddForce(boatRight * sideSign * Mathf.Max(5.5f, impactPushSpeed * 4f),
-                    ForceMode.VelocityChange);
+                forcedSlideDirection = boatRight * sideSign;
+                forcedSlideUntil = Time.time + cargoBoatSlideDuration;
+                recoveryUntil = forcedSlideUntil + .25f;
+                StartCoroutine(AllowCargoBoatPass(GetComponent<Collider>(), collision.collider));
                 return;
             }
             if (!health.IsDead && body != null && !body.isKinematic)
             {
                 body.AddForce(push * impactPushSpeed, ForceMode.VelocityChange);
             }
+        }
+
+        private IEnumerator AllowCargoBoatPass(Collider sharkCollider, Collider boatCollider)
+        {
+            if (sharkCollider == null || boatCollider == null) yield break;
+            Physics.IgnoreCollision(sharkCollider, boatCollider, true);
+            yield return new WaitForSeconds(cargoBoatSlideDuration);
+            if (sharkCollider != null && boatCollider != null)
+                Physics.IgnoreCollision(sharkCollider, boatCollider, false);
         }
         private static Vector3 Flat(Vector3 v) => new Vector3(v.x, 0, v.z);
         private void OnDrawGizmosSelected()

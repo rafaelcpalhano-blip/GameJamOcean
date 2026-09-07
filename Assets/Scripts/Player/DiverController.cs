@@ -211,6 +211,7 @@ namespace GameJamOcean.Player
                     dashHeading = dashDirection;
                     dashUntil = Time.time + dashDuration;
                     nextDashTime = Time.time + dashCooldown;
+                    GameJamOcean.Audio.GameAudio.Instance?.PlayAquaticDash(false);
                 }
                 if (IsDashing && Time.time >= nextBubbleTime)
                 {

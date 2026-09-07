@@ -161,6 +161,7 @@ namespace GameJamOcean.Rewards
             }
 
             opened = true;
+            GameJamOcean.Audio.GameAudio.Instance?.PlayChestOpen(chestType == ChestRewardType.Final);
             awardedGold = chestType == ChestRewardType.Final
                 ? sessionManager.CalculateFinalChestReward()
                 : Random.Range(minimumGold, maximumGold + 1);

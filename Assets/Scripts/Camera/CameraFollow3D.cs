@@ -213,6 +213,14 @@ namespace GameJamOcean.CameraSystem
         private float impactStartedAt = float.NegativeInfinity;
         private Vector3 impactDirection;
 
+        [Header("Turbo Microshake")]
+        [SerializeField, Range(0f, .08f)] private float turboShakeDistance = .012f;
+        [SerializeField, Range(0f, 1f)] private float turboShakeRollDegrees = .1f;
+        [SerializeField, Min(1f)] private float turboShakeFrequency = 17f;
+        [SerializeField, Min(.1f)] private float turboShakeBlendSpeed = 7f;
+        private bool turboShakeRequested;
+        private float turboShakeWeight;
+
         private Vector3 followVelocity;
         private Vector3 basePosition;
         private Quaternion baseRotation;
@@ -243,6 +251,8 @@ namespace GameJamOcean.CameraSystem
 
         private void LateUpdate()
         {
+            turboShakeWeight = Mathf.MoveTowards(turboShakeWeight,
+                turboShakeRequested ? 1f : 0f, turboShakeBlendSpeed * Time.unscaledDeltaTime);
             if (cinematicCamera)
             {
                 if (menuReturn == null) UpdateEndGameOrbit(Time.unscaledDeltaTime);
@@ -286,10 +296,20 @@ namespace GameJamOcean.CameraSystem
             Vector3 impactOffset = impactDirection * (recoilPulse * impactRecoilDistance)
                 + (baseRotation * Vector3.right + baseRotation * Vector3.up * .45f)
                     * (shake * impactShakeDistance);
+            float turboPhase = Time.time * turboShakeFrequency * Mathf.PI * 2f;
+            float turboHorizontal = Mathf.Sin(turboPhase) * turboShakeWeight;
+            float turboVertical = Mathf.Sin(turboPhase * 1.37f + 1.1f) * turboShakeWeight;
+            Vector3 turboOffset = (baseRotation * Vector3.right * turboHorizontal
+                + baseRotation * Vector3.up * turboVertical) * turboShakeDistance;
             transform.SetPositionAndRotation(
-                basePosition + Vector3.up * (wave * bobHeight * intensity) + impactOffset,
+                basePosition + Vector3.up * (wave * bobHeight * intensity) + impactOffset + turboOffset,
                 baseRotation * Quaternion.Euler(wave * pitchDegrees * intensity - appliedElevation,
-                    0f, shake * impactRollDegrees));
+                    0f, shake * impactRollDegrees + turboHorizontal * turboShakeRollDegrees));
+        }
+
+        public void SetTurboMicroshake(bool active)
+        {
+            turboShakeRequested = active;
         }
 
         public void PlayCollisionImpact(Vector3 worldPushDirection)
@@ -393,6 +413,8 @@ namespace GameJamOcean.CameraSystem
 
         private void OnDisable()
         {
+            turboShakeRequested = false;
+            turboShakeWeight = 0f;
             draggingOrbit = false;
             desiredOrbitYaw = 0f;
             orbitReleasedAt = float.NegativeInfinity;

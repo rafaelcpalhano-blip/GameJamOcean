@@ -147,6 +147,7 @@ namespace GameJamOcean.UI
             var text = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI)).GetComponent<TextMeshProUGUI>();
             text.transform.SetParent(parent, false); text.rectTransform.anchorMin = text.rectTransform.anchorMax = new Vector2(0,1);
             text.rectTransform.pivot = new Vector2(0,1); text.rectTransform.sizeDelta = size; text.rectTransform.anchoredPosition = position;
+            GameFontStyles.Apply(text, GameFontRole.Display);
             text.fontSize = font; text.color = color; text.alignment = TextAlignmentOptions.MidlineLeft; text.raycastTarget = false; return text;
         }
 

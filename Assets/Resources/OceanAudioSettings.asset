@@ -15,11 +15,38 @@ MonoBehaviour:
   oceanAmbience: {fileID: 8300000, guid: e3a8d45612da4624cb7f92d756639be1, type: 3}
   panelOpen: {fileID: 8300000, guid: a04180208ff43074fa72f42f8e61983b, type: 3}
   writing: {fileID: 8300000, guid: 7bdec05c3629e5b48a26af04aca74b55, type: 3}
-  ambienceGain: 0.65
   harpoonShot: {fileID: 8300000, guid: 2be5e56fb0c99144484b0d79a21e6d18, type: 3}
   diveAmbience: {fileID: 8300000, guid: 228851c69bfdfb6479768d9755fff634, type: 3}
   diveRandomAmbience: {fileID: 8300000, guid: 35a56db5f356630449b845c2085977c6, type: 3}
+  divePauseAmbience: {fileID: 8300000, guid: 7b185606de4bbde49a7e2564de53d5b3, type: 3}
+  divePauseAmbienceVolume: 0.12
   coinReward: {fileID: 8300000, guid: cbf1eb4627d04d8c92dbe6de3c6633d0, type: 3}
+  chestOpen: {fileID: 8300000, guid: f4eea8ac23361ae48b1fbca1d64e6009, type: 3}
+  chestOpenVolume: 2
+  bigChestVolumeMultiplier: 2
+  aquaticDash: {fileID: 8300000, guid: 4fa2ab939ea7de646b2f81fb063d25b8, type: 3}
+  aquaticDashVolume: 1.2
+  enemyDashVolumeMultiplier: 0.65
+  villageConstruction: {fileID: 8300000, guid: a75c870d06190b840b653cfeb4644e45, type: 3}
+  villageConstructionVolume: 0.5
+  boatTurbo: {fileID: 8300000, guid: 3a9c3dcbbbeb74b41b22e6316be833c4, type: 3}
+  boatTurboVolume: 0.08
+  boatTurboFadeOutSeconds: 0.15
+  boatUpgrade: {fileID: 8300000, guid: d67787305ad6e2941a725c808c57e8b8, type: 3}
+  boatUpgradeVolume: 1
+  diverWaterJump: {fileID: 8300000, guid: 6bb7f8253c11a574cabb7511c268090a, type: 3}
+  diverWaterJumpVolume: 1
+  boatCollision: {fileID: 8300000, guid: 0f272ff939b36534b99e3c848c800701, type: 3}
+  boatCollisionVolume: 1
+  boat1Engine: {fileID: 8300000, guid: 6d1a173b49bf6f54a9c24a897a6cddca, type: 3}
+  boat1EngineVolume: 0.55
+  boat2Engine: {fileID: 8300000, guid: a7622c8e5a6d3b14683d87d1e94f4855, type: 3}
+  boat2EngineVolume: 0.4
+  boat3Engine: {fileID: 8300000, guid: e17a0650c43a2644ba4d488a70dba822, type: 3}
+  boat3EngineVolume: 0.4
+  engineVolumeTransitionSpeed: 3
+  engineMenuMuteTransitionSpeed: 8
   randomMinimumInterval: 2
   randomMaximumInterval: 5
   randomAmbienceGain: 0.6
+  ambienceGain: 0.65
