@@ -18,6 +18,8 @@ namespace GameJamOcean.Audio
         private float targetEngineMenuVolumeMultiplier = 1f;
         private float boatTurboFadeMultiplier = 1f;
         private Coroutine boatTurboFade;
+        private Coroutine sceneMusicFade;
+        private float sceneMusicFadeMultiplier = 1f;
         public float BackgroundVolume { get; private set; }
         public float EffectsVolume { get; private set; }
         public float PanelOpenDuration => settings != null && settings.panelOpen != null
@@ -76,15 +78,19 @@ namespace GameJamOcean.Audio
         public void SetBackground(float value)
         {
             BackgroundVolume = Mathf.Clamp01(value);
+            ApplyBackgroundVolumes();
+            PlayerPrefs.SetFloat("GameJamOcean.Settings.Background", BackgroundVolume);
+        }
+        private void ApplyBackgroundVolumes()
+        {
             string scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
             float ambienceVolume = settings == null ? 1f : scene == "DiveScene"
                 ? settings.diveAmbienceVolume : settings.oceanAmbienceVolume;
             ambience.volume = BackgroundVolume * ambienceVolume;
             float musicVolume = settings == null ? 1f : scene == "DiveScene"
                 ? settings.diveMusicVolume : settings.oceanMusicVolume;
-            sceneMusic.volume = BackgroundVolume * musicVolume;
+            sceneMusic.volume = BackgroundVolume * musicVolume * sceneMusicFadeMultiplier;
             randomAmbience.volume = BackgroundVolume * (settings != null ? settings.randomAmbienceGain : 1f);
-            PlayerPrefs.SetFloat("GameJamOcean.Settings.Background", BackgroundVolume);
         }
         public void SetEffects(float value)
         {
@@ -117,9 +123,16 @@ namespace GameJamOcean.Audio
                 : scene == "DiveScene" ? settings.diveMusic : null;
             if (next != ambience.clip) { ambience.Stop(); ambience.clip = next; }
             if (nextMusic != sceneMusic.clip) { sceneMusic.Stop(); sceneMusic.clip = nextMusic; }
+            if (sceneMusicFade != null) StopCoroutine(sceneMusicFade);
+            sceneMusicFade = null;
+            sceneMusicFadeMultiplier = nextMusic != null ? 0f : 1f;
             SetBackground(BackgroundVolume);
             if (next != null && !ambience.isPlaying) ambience.Play();
-            if (nextMusic != null && !sceneMusic.isPlaying) sceneMusic.Play();
+            if (nextMusic != null)
+            {
+                if (!sceneMusic.isPlaying) sceneMusic.Play();
+                sceneMusicFade = StartCoroutine(FadeInSceneMusic(2f));
+            }
             if (next == null && nextMusic == null) return;
             if (scene == "OceanScene_3D")
             {
@@ -129,6 +142,20 @@ namespace GameJamOcean.Audio
             }
             if (scene == "DiveScene" && settings.diveRandomAmbience != null)
                 randomSounds = StartCoroutine(RandomDiveSounds());
+        }
+        private IEnumerator FadeInSceneMusic(float duration)
+        {
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                sceneMusicFadeMultiplier = Mathf.Clamp01(elapsed / Mathf.Max(.01f, duration));
+                ApplyBackgroundVolumes();
+                yield return null;
+            }
+            sceneMusicFadeMultiplier = 1f;
+            ApplyBackgroundVolumes();
+            sceneMusicFade = null;
         }
         public void EnsureAmbiencePlaying()
         {

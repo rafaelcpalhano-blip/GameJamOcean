@@ -35,6 +35,8 @@ namespace GameJamOcean.UI
         private bool requestIntro, transitioning;
         private bool showingLetter;
         private Coroutine typewriter;
+        private Coroutine continuePromptBlink;
+        private TMP_Text continuePrompt;
         private static readonly string[] RescueMessages =
         {
             "O mar não está pra peixe… e hoje também não estava pra barco! Respire fundo: amanhã a pescaria de tesouros continua.",
@@ -105,6 +107,7 @@ namespace GameJamOcean.UI
             if (scene.name == Ocean) GameJamOcean.Boat.BoatVisualUpgrade3D.ConfigureScene(scene);
             if (scene.name == Ocean) GameJamOcean.World.LighthouseEndGameLight3D.ConfigureScene(scene);
             if (scene.name == Ocean) GameJamOcean.World.OceanHorizonBackdrop3D.ConfigureScene(scene);
+            if (scene.name == Ocean) GameJamOcean.World.OceanVfxScene3D.ConfigureScene(scene);
             loading = false;
             bool showMain = scene.name == Ocean && (firstScene || requestMain);
             firstScene = false;
@@ -298,9 +301,9 @@ namespace GameJamOcean.UI
                 + "Quanto mais você conquistar, mais poderá melhorar suas instalações, seu transporte e seus equipamentos. "
                 + "Mas não se engane: quanto mais forte você ficar, mais profundo poderá ir… e maiores serão os perigos que encontrará.",
                 -95, 23, 335);
-            Label("Clique ou pressione WASD / setas para continuar", -450, 18);
             gameAudio.StartLetter();
             BeginTypewriter(body);
+            PrepareContinuePrompt(-450);
         }
 
         public static void ShowRescueLetter(bool firstDeathFree, int chargedGold, int configuredCost)
@@ -318,9 +321,9 @@ namespace GameJamOcean.UI
                     ? $"Conserto após o naufrágio: {configuredCost} Gold.\nValor debitado: {chargedGold} Gold.\n\nA vila concedeu um desconto porque sabe que suas finanças não andam boas. A vida no mar não é fácil, mas pode ser muito recompensadora conforme você adquire experiência."
                     : $"{RescueMessages[UnityEngine.Random.Range(0, RescueMessages.Length)]}\n\nConserto após o naufrágio: {configuredCost} Gold.\nValor debitado: {chargedGold} Gold.";
             TMP_Text body = instance.Label(message, -130, 26, 260);
-            instance.Label("Clique ou pressione WASD / setas para continuar", -450, 18);
             instance.gameAudio.StartLetter();
             instance.BeginTypewriter(body);
+            instance.PrepareContinuePrompt(-450);
         }
 
         private void BeginTypewriter(TMP_Text text)
@@ -345,12 +348,43 @@ namespace GameJamOcean.UI
                 yield return null;
             }
             typewriter = null;
+            ShowContinuePrompt();
+        }
+
+        private void PrepareContinuePrompt(float y)
+        {
+            continuePrompt = Label("Clique ou pressione WASD / setas para continuar", y, 18);
+            continuePrompt.gameObject.SetActive(false);
+        }
+
+        private void ShowContinuePrompt()
+        {
+            if (!showingLetter || continuePrompt == null) return;
+            continuePrompt.gameObject.SetActive(true);
+            if (continuePromptBlink != null) StopCoroutine(continuePromptBlink);
+            continuePromptBlink = StartCoroutine(BlinkContinuePrompt());
+        }
+
+        private IEnumerator BlinkContinuePrompt()
+        {
+            while (continuePrompt != null)
+            {
+                Color color = continuePrompt.color;
+                color.a = Mathf.Lerp(.48f, .76f,
+                    (Mathf.Sin(Time.unscaledTime * 2.1f) + 1f) * .5f);
+                continuePrompt.color = color;
+                yield return null;
+            }
+            continuePromptBlink = null;
         }
 
         private void StopTypewriter()
         {
             if (typewriter != null) StopCoroutine(typewriter);
             typewriter = null;
+            if (continuePromptBlink != null) StopCoroutine(continuePromptBlink);
+            continuePromptBlink = null;
+            continuePrompt = null;
         }
 
         private IEnumerator EnterGameplay()

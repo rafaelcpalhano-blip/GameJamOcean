@@ -1567,6 +1567,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b2a425c7ec894ee4a63160b9b977412d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameJamOcean.Progression.PortUpgradePanel
+  villageLevel0: {fileID: 0}
   villageLevel1: {fileID: 1459024344}
   villageLevel2: {fileID: 939807377}
   villageLevel3: {fileID: 1672126391}
@@ -4801,6 +4802,10 @@ MonoBehaviour:
   impactShakeDistance: 0.22
   impactRollDegrees: 1.8
   impactShakeFrequency: 5
+  turboShakeDistance: 0.012
+  turboShakeRollDegrees: 0.1
+  turboShakeFrequency: 17
+  turboShakeBlendSpeed: 7
 --- !u!4 &971364575 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1645566415353758621, guid: 966405caf12ffbe648d6bb35e745191b, type: 3}
@@ -7865,6 +7870,12 @@ MonoBehaviour:
   turboRechargeDelay: 1.25
   currentTurboCharge: 3
   turboActive: 0
+  collisionAudioMinimumSpeed: 0.5
+  collisionAudioCooldown: 0.4
+  collisionRecoil: 0.12
+  maximumCollisionRecoilSpeed: 0.45
+  collisionTangentialRetention: 0.9
+  collisionSlideAssistDuration: 0.35
   modelForwardOffset: 0
 --- !u!65 &1699770397
 BoxCollider:
@@ -7986,6 +7997,7 @@ MonoBehaviour:
   sinkingDuration: 3.5
   sinkingDepth: 5
   sinkingRoll: 22
+  destructionGoldCost: 200
 --- !u!114 &1699770402
 MonoBehaviour:
   m_ObjectHideFlags: 0

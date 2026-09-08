@@ -44,6 +44,7 @@ namespace GameJamOcean.Progression
                 if (cost > 0 && !progress.TrySpendGold(cost)) { statusLabel.text = "Ouro insuficiente para o conserto."; return; }
                 health.Heal(health.MaximumHealth - health.CurrentHealth);
                 statusLabel.text = $"Barco consertado! Casco 100%. Custo: {cost} ouro.";
+                ShowUpgradeAcquiredColor();
                 Refresh();
             }
             finally { repairing = false; }

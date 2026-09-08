@@ -1,7 +1,15 @@
+using System;
 using UnityEngine;
 
 namespace GameJamOcean.Audio
 {
+    [Serializable]
+    public sealed class TornadoRoute3D
+    {
+        [Tooltip("Exactly three positions normalized inside the navigable ocean bounds.")]
+        public Vector2[] normalizedPoints = new Vector2[3];
+    }
+
     [CreateAssetMenu(menuName = "GameJamOcean/Audio Settings")]
     public sealed class OceanAudioSettings : ScriptableObject
     {
@@ -65,5 +73,42 @@ namespace GameJamOcean.Audio
         [Min(.1f)] public float randomMaximumInterval = 5f;
         [Range(0f, 1f)] public float randomAmbienceGain = .6f;
         [Range(0f, 1f)] public float diveAmbienceVolume = .65f;
+
+        [Header("Ocean VFX — Boat collision")]
+        public GameObject boatCollisionEffect;
+        [Min(.1f)] public float boatCollisionEffectLifetime = 2.5f;
+        [Min(.01f)] public float boatCollisionEffectScale = 1f;
+        public float boatCollisionWaterOffset;
+
+        [Header("Ocean VFX — Tornado obstacle")]
+        public GameObject tornadoPrefab;
+        public AudioClip tornadoSound;
+        [Range(0f, 1f)] public float tornadoSoundVolume = .7f;
+        [Min(.1f)] public float tornadoSoundMinimumDistance = 3f;
+        [Min(.1f)] public float tornadoSoundMaximumDistance = 18f;
+        [Min(1)] public int tornadoCount = 6;
+        [Min(1)] public int tornadoMinimumActive = 3;
+        [Min(.1f)] public float tornadoSpeed = 2f;
+        [Min(0f)] public float tornadoZigzagAmplitude = 1.25f;
+        [Min(.1f)] public float tornadoZigzagCycles = 1.5f;
+        [Min(.01f)] public float tornadoVisualScale = 2.3f;
+        [Min(.1f)] public float tornadoColliderRadius = 1.25f;
+        [Min(.1f)] public float tornadoPullRadius = 8f;
+        [Min(0f)] public float tornadoPullAcceleration = 1.25f;
+        [Min(.1f)] public float tornadoSpiralCaptureRadius = 3f;
+        [Min(.1f)] public float tornadoCenterRadius = 1.5f;
+        [Min(.1f)] public float tornadoSpiralDuration = 1.75f;
+        [Min(0f)] public float tornadoLaunchSpeed = 9f;
+        [Min(0f)] public float tornadoLaunchControlLockSeconds = .6f;
+        [Min(0f)] public float tornadoBoat1Damage = 20f;
+        [Min(0f)] public float tornadoBoat2Damage = 15f;
+        [Min(0f)] public float tornadoBoat3Damage = 10f;
+        [Min(.1f)] public float tornadoCenterCooldown = 1.25f;
+        public float tornadoWaterOffset = -1.5f;
+        [Min(0f)] public float tornadoMinimumHiddenSeconds = 10f;
+        [Min(0f)] public float tornadoMaximumHiddenSeconds = 20f;
+        [Min(0f)] public float tornadoInitialDelayMaximum = 20f;
+        [Min(.05f)] public float tornadoDisappearanceFadeSeconds = .6f;
+        public TornadoRoute3D[] tornadoRoutes;
     }
 }

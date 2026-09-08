@@ -65,10 +65,12 @@ namespace GameJamOcean.Boat
         private Vector3 lastDrivenVelocity;
         private Quaternion lastDrivenRotation;
         private float nextCollisionAudioTime;
+        private float nextCollisionVfxTime;
         private GameJamOcean.CameraSystem.CameraFollow3D cameraFollow;
         private Vector3 collisionSlideNormal;
         private float collisionSlideUntil;
         private float nextCollisionResponseTime;
+        private float externalDashUntil;
 
         public float MaximumSpeed => maximumSpeed;
         public Vector3 DockPosition { get; private set; }
@@ -205,6 +207,13 @@ namespace GameJamOcean.Boat
         private void FixedUpdate()
         {
             if (GameJamOcean.UI.GameMenus.BlocksGameplay || boatRigidbody.isKinematic) return;
+            if (Time.time < externalDashUntil)
+            {
+                boatRigidbody.angularVelocity = Vector3.zero;
+                lastDrivenVelocity = boatRigidbody.linearVelocity;
+                lastDrivenRotation = boatRigidbody.rotation;
+                return;
+            }
             // Steering owns yaw; collision torque must not keep turning the hull.
             boatRigidbody.angularVelocity = Vector3.zero;
             float deltaTime = Time.fixedDeltaTime;
@@ -268,6 +277,20 @@ namespace GameJamOcean.Boat
             boatRigidbody.MoveRotation(drivenRotation);
             lastDrivenVelocity = boatRigidbody.linearVelocity;
             lastDrivenRotation = drivenRotation;
+        }
+
+        public void ApplyExternalDash(Vector3 direction, float speed, float controlLockSeconds)
+        {
+            if (boatRigidbody == null || boatRigidbody.isKinematic) return;
+            direction.y = 0f;
+            if (direction.sqrMagnitude < .001f) direction = NavigationForward;
+            direction.Normalize();
+            float vertical = boatRigidbody.linearVelocity.y;
+            boatRigidbody.linearVelocity = new Vector3(direction.x * speed, vertical, direction.z * speed);
+            boatRigidbody.angularVelocity = Vector3.zero;
+            externalDashUntil = Time.time + Mathf.Max(0f, controlLockSeconds);
+            lastDrivenVelocity = boatRigidbody.linearVelocity;
+            lastDrivenRotation = boatRigidbody.rotation;
         }
 
         public void RejectCollisionRecoil()
@@ -364,6 +387,15 @@ namespace GameJamOcean.Boat
 
         private void OnCollisionEnter(Collision collision)
         {
+            if (Time.time >= nextCollisionVfxTime && collision.contactCount > 0
+                && collision.relativeVelocity.magnitude >= collisionAudioMinimumSpeed)
+            {
+                nextCollisionVfxTime = Time.time + collisionAudioCooldown;
+                ContactPoint contact = collision.GetContact(0);
+                Vector3 impactPosition = contact.point;
+                impactPosition.y = transform.position.y;
+                GameJamOcean.World.OceanVfxScene3D.SpawnBoatImpact(impactPosition, contact.normal);
+            }
             if (!IsIslandScenery(collision.transform)) return;
             ResolveSolidCollision(collision);
             if (Time.time < nextCollisionAudioTime

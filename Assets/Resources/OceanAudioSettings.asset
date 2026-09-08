@@ -61,3 +61,48 @@ MonoBehaviour:
   randomMaximumInterval: 5
   randomAmbienceGain: 0.6
   diveAmbienceVolume: 0.65
+  boatCollisionEffect: {fileID: 8763651459646022762, guid: 281bfe86c42402b4d9ee04686bb09bdc, type: 3}
+  boatCollisionEffectLifetime: 2.5
+  boatCollisionEffectScale: 1
+  boatCollisionWaterOffset: 0
+  tornadoPrefab: {fileID: 4569050796914111343, guid: 87f8961664f710042b5904a75c6e1cdb, type: 3}
+  tornadoSound: {fileID: 8300000, guid: a20b285596d78184cb7581b7ec31953d, type: 3}
+  tornadoSoundVolume: 0.7
+  tornadoSoundMinimumDistance: 3
+  tornadoSoundMaximumDistance: 18
+  tornadoCount: 6
+  tornadoMinimumActive: 3
+  tornadoSpeed: 2
+  tornadoZigzagAmplitude: 1.25
+  tornadoZigzagCycles: 1.5
+  tornadoVisualScale: 2.3
+  tornadoColliderRadius: 1.25
+  tornadoPullRadius: 8
+  tornadoPullAcceleration: 1.25
+  tornadoSpiralCaptureRadius: 3
+  tornadoCenterRadius: 1.5
+  tornadoSpiralDuration: 1.75
+  tornadoLaunchSpeed: 9
+  tornadoLaunchControlLockSeconds: 0.6
+  tornadoBoat1Damage: 20
+  tornadoBoat2Damage: 15
+  tornadoBoat3Damage: 10
+  tornadoCenterCooldown: 1.25
+  tornadoWaterOffset: -1.5
+  tornadoMinimumHiddenSeconds: 10
+  tornadoMaximumHiddenSeconds: 20
+  tornadoInitialDelayMaximum: 20
+  tornadoDisappearanceFadeSeconds: 0.6
+  tornadoRoutes:
+  - normalizedPoints:
+    - {x: 0.12, y: 0.22}
+    - {x: 0.28, y: 0.12}
+    - {x: 0.4, y: 0.3}
+  - normalizedPoints:
+    - {x: 0.62, y: 0.12}
+    - {x: 0.84, y: 0.28}
+    - {x: 0.72, y: 0.46}
+  - normalizedPoints:
+    - {x: 0.16, y: 0.7}
+    - {x: 0.38, y: 0.86}
+    - {x: 0.52, y: 0.68}
