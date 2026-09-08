@@ -51,7 +51,11 @@ namespace GameJamOcean.EditorTools
         {
             string path = $"{PrefabFolder}/{name}.prefab";
             GameObject existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-            if (existing != null) return existing;
+            if (existing != null)
+            {
+                RepairPanel(path);
+                return AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            }
             var root = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer),
                 typeof(Image), typeof(EditableUIPanelTemplate));
             RectTransform rect = root.GetComponent<RectTransform>();
@@ -73,7 +77,11 @@ namespace GameJamOcean.EditorTools
         {
             string path = $"{PrefabFolder}/Button.prefab";
             GameObject existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-            if (existing != null) return existing;
+            if (existing != null)
+            {
+                RepairButton(path);
+                return AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            }
             var root = new GameObject("Button", typeof(RectTransform), typeof(CanvasRenderer),
                 typeof(Image), typeof(Button), typeof(UIButtonAudioFeedback));
             root.GetComponent<RectTransform>().sizeDelta = new Vector2(440, 52);
@@ -97,6 +105,60 @@ namespace GameJamOcean.EditorTools
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(root, path);
             Object.DestroyImmediate(root);
             return prefab;
+        }
+
+        private static void RepairPanel(string path)
+        {
+            GameObject root = PrefabUtility.LoadPrefabContents(path);
+            bool changed = RemoveMissingScripts(root);
+            EditableUIPanelTemplate marker = root.GetComponent<EditableUIPanelTemplate>();
+            if (marker == null)
+            {
+                marker = root.AddComponent<EditableUIPanelTemplate>();
+                changed = true;
+            }
+            RectTransform content = root.transform.Find("Runtime Content") as RectTransform;
+            if (content == null)
+            {
+                content = new GameObject("Runtime Content", typeof(RectTransform)).GetComponent<RectTransform>();
+                content.SetParent(root.transform, false);
+                content.anchorMin = Vector2.zero;
+                content.anchorMax = Vector2.one;
+                content.offsetMin = content.offsetMax = Vector2.zero;
+                changed = true;
+            }
+            if (marker.RuntimeContent != content)
+            {
+                marker.Configure(content);
+                changed = true;
+            }
+            if (changed) PrefabUtility.SaveAsPrefabAsset(root, path);
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+
+        private static void RepairButton(string path)
+        {
+            GameObject root = PrefabUtility.LoadPrefabContents(path);
+            bool changed = RemoveMissingScripts(root);
+            if (root.GetComponent<UIButtonAudioFeedback>() == null)
+            {
+                root.AddComponent<UIButtonAudioFeedback>();
+                changed = true;
+            }
+            if (changed) PrefabUtility.SaveAsPrefabAsset(root, path);
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+
+        private static bool RemoveMissingScripts(GameObject root)
+        {
+            bool changed = false;
+            foreach (Transform item in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (GameObjectUtility.GetMonoBehavioursWithMissingScriptCount(item.gameObject) <= 0) continue;
+                GameObjectUtility.RemoveMonoBehavioursWithMissingScript(item.gameObject);
+                changed = true;
+            }
+            return changed;
         }
 
         private static void EnsureFolder(string parent, string child)

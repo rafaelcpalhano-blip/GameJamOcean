@@ -222,6 +222,7 @@ MonoBehaviour:
   attackDamage: 1
   attackCooldown: 1.25
   attackSound: {fileID: 8300000, guid: e4eb3bcb012a9fa49a9bb40118a1564d, type: 3}
+  attackSoundVolume: 1
   onAttack:
     m_PersistentCalls:
       m_Calls: []

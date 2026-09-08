@@ -28,6 +28,8 @@ namespace GameJamOcean.Player
         [Header("Damage Feedback")]
         [SerializeField, Min(0.1f)] private float hitImmunitySeconds = 1.5f;
         [SerializeField, Min(1)] private int hitBlinks = 3;
+        [SerializeField] private AudioClip damageSound;
+        [SerializeField, Range(0f, 2f)] private float damageSoundVolume = 1f;
         [Header("Dash (Shift)")]
         [SerializeField, Min(0.1f)] private float dashCooldown = 5f;
         [SerializeField, Range(0f, 40f)] private float dashSteeringAngle = 30f;
@@ -225,6 +227,7 @@ namespace GameJamOcean.Player
         private void OnDamaged(Health target, GameObject source)
         {
             hitTime = Time.time;
+            GameJamOcean.Audio.GameAudio.Instance?.PlayEffect(damageSound, damageSoundVolume);
             if (spriteRenderer == null) return;
             Vector3 top = spriteRenderer.bounds.center
                 + Vector3.up * (spriteRenderer.bounds.extents.y + .2f);

@@ -144,8 +144,13 @@ namespace GameJamOcean.Spawning
         private void SpawnInitialEnemies()
         {
             reservedPositions.Clear();
+            int consecutiveFailures = 0;
+            int maximumFailures = Mathf.Max(10, initialTarget * 2);
             while (sessionManager.CanSpawnEnemy && sessionManager.SpawnedEnemies < initialTarget)
-                if (!TrySpawnEnemy()) break;
+            {
+                if (TrySpawnEnemy()) consecutiveFailures = 0;
+                else if (++consecutiveFailures >= maximumFailures) break;
+            }
         }
 
         private void Update()

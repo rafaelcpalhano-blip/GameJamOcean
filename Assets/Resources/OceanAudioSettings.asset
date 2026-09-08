@@ -21,6 +21,8 @@ MonoBehaviour:
   divePauseAmbience: {fileID: 8300000, guid: 7b185606de4bbde49a7e2564de53d5b3, type: 3}
   divePauseAmbienceVolume: 0.12
   coinReward: {fileID: 8300000, guid: cbf1eb4627d04d8c92dbe6de3c6633d0, type: 3}
+  powerUpCollected: {fileID: 8300000, guid: eb6e5524cd574d744aab1235a066daa5, type: 3}
+  powerUpCollectedVolume: 1
   chestOpen: {fileID: 8300000, guid: f4eea8ac23361ae48b1fbca1d64e6009, type: 3}
   chestOpenVolume: 2
   bigChestVolumeMultiplier: 2

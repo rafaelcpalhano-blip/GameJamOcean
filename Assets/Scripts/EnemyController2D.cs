@@ -65,6 +65,7 @@ namespace GameJamOcean.Enemies
         [SerializeField, Min(0.01f)] private float attackCooldown = 1.25f;
         [SerializeField] private UnityEvent onAttack;
         [SerializeField] private AudioClip attackSound;
+        [SerializeField, Range(0f, 2f)] private float attackSoundVolume = 1f;
         [SerializeField] private UnityEvent onEnemyDied;
 
         [Header("Projectile Attack")]
@@ -220,7 +221,8 @@ namespace GameJamOcean.Enemies
 
             UpdateVisualDirection(direction.x);
 
-            if (distance <= attackRange
+            bool mageCanAttack = speciesProfile == SpeciesProfile.SereiaMaga && IsVisibleOnScreen();
+            if ((distance <= attackRange || mageCanAttack)
                 && (speciesProfile != SpeciesProfile.Polvo
                     || octopusStrikePhase == OctopusStrikePhase.Charge))
             {
@@ -353,12 +355,12 @@ namespace GameJamOcean.Enemies
             nextAttackTime = Time.time + attackCooldown / Mathf.Max(1f, currentAggression);
             PlayActionAnimation(attackStateHash, attackAnimationDuration);
             onAttack?.Invoke();
-            GameJamOcean.Audio.GameAudio.Instance?.PlayEffect(attackSound);
+            GameJamOcean.Audio.GameAudio.Instance?.PlayEffect(attackSound, attackSoundVolume);
 
             if (attackType == EnemyAttackType.Projectile)
             {
                 Vector2 direction = ((Vector2)target.position - enemyRigidbody.position).normalized;
-                int shots = speciesProfile == SpeciesProfile.SereiaMaga && UnityEngine.Random.value < .5f ? 2 : 1;
+                const int shots = 1;
                 StartCoroutine(LaunchProjectileAfterDelay(direction, shots));
                 return;
             }
@@ -397,6 +399,15 @@ namespace GameJamOcean.Enemies
                 projectile.Launch(direction, targetHealth, gameObject, attackDamage);
                 if (shot + 1 < shots) yield return new WaitForSeconds(.18f);
             }
+        }
+
+        private bool IsVisibleOnScreen()
+        {
+            Camera camera = Camera.main;
+            if (camera == null) return false;
+            Vector3 viewport = camera.WorldToViewportPoint(transform.position);
+            return viewport.z > 0f && viewport.x >= 0f && viewport.x <= 1f
+                && viewport.y >= 0f && viewport.y <= 1f;
         }
 
         private void HandleHarpoonFired(Vector2 origin, Vector2 direction)

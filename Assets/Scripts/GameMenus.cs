@@ -59,6 +59,9 @@ namespace GameJamOcean.UI
         private Rigidbody menuBoat;
         private bool boatWasKinematic;
         private Vector3 boatVelocity, boatAngularVelocity;
+        private bool customCursorApplied;
+        private Texture2D scaledCursorTexture;
+        private Texture2D cursorSource;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics() { instance = null; resumeFrame = -1; SteeringMultiplier = 1f; BoatRecoveryActive = false; EndGameActive = false; }
@@ -162,6 +165,7 @@ namespace GameJamOcean.UI
 
         private void LateUpdate()
         {
+            UpdateCursorAppearance();
             if (!open || !main) return;
             // Also catches HUDs constructed by other components in Start.
             foreach (var other in FindObjectsByType<Canvas>(FindObjectsSortMode.None))
@@ -170,6 +174,48 @@ namespace GameJamOcean.UI
                 hiddenCanvases.Add(other);
                 other.enabled = false;
             }
+        }
+
+        private void UpdateCursorAppearance()
+        {
+            Texture2D source = EditableUIFactory.Settings != null
+                ? EditableUIFactory.Settings.gameCursor : null;
+            if (source != cursorSource)
+            {
+                if (scaledCursorTexture != null) Destroy(scaledCursorTexture);
+                cursorSource = source;
+                scaledCursorTexture = source != null ? CreateScaledCursor(source, 4) : null;
+                customCursorApplied = false;
+            }
+            Texture2D cursor = scaledCursorTexture;
+            if (Cursor.visible && cursor != null)
+            {
+                if (customCursorApplied) return;
+                Cursor.SetCursor(cursor, EditableUIFactory.Settings.cursorHotspot * 4f,
+                    CursorMode.ForceSoftware);
+                customCursorApplied = true;
+            }
+            else if (customCursorApplied)
+            {
+                Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
+                customCursorApplied = false;
+            }
+        }
+
+        private static Texture2D CreateScaledCursor(Texture2D source, int scale)
+        {
+            Color32[] original = source.GetPixels32();
+            int width = source.width * scale;
+            int height = source.height * scale;
+            Color32[] enlarged = new Color32[width * height];
+            for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+                enlarged[y * width + x] = original[(y / scale) * source.width + x / scale];
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            { name = source.name + " 4x Cursor", filterMode = FilterMode.Point };
+            texture.SetPixels32(enlarged);
+            texture.Apply(false, true);
+            return texture;
         }
 
         private void Freeze(bool isMain)
@@ -365,21 +411,24 @@ namespace GameJamOcean.UI
             {
                 var progress = GameProgress.Instance;
                 bool hasSave = progress != null && progress.HasSavedGame;
+                panel.sizeDelta = new Vector2(panel.sizeDelta.x, hasSave ? 420f : 360f);
                 Label(hasSave ? $"Sua aldeia • nível {progress.GetLevel(UpgradeKind.Island)}" : "Uma nova aventura espera por você", -85, 20);
                 Button(hasSave ? "Continuar" : "Iniciar", -145, () =>
                 {
                     if (hasSave) StartGameplay();
                     else { PrepareNewGameTutorials(); ShowLetter(); }
-                });
-                if (hasSave) Button("Novo jogo", -210, ConfirmNewGame);
-                Button("Ajustes", -285, ShowSettings);
+                }, 360f);
+                if (hasSave) Button("Novo jogo", -210, ConfirmNewGame, 360f);
+                Button("Ajustes", hasSave ? -275 : -215, ShowSettings, 360f);
+                Button("Sair", hasSave ? -340 : -280, ExitGame, 360f);
             }
             else
             {
-                Button("Continuar partida  [ P ]", -100, Resume);
+                panel.sizeDelta = new Vector2(panel.sizeDelta.x, 420f);
+                Button("Continuar", -100, Resume);
                 Button("Voltar à ilha", -170, () => ConfirmTravel(false));
-                Button("Voltar ao menu", -240, () => ConfirmTravel(true));
-                Button("Ajustes", -310, ShowSettings);
+                Button("Ajustes", -240, ShowSettings);
+                Button("Voltar ao menu", -310, () => ConfirmTravel(true));
             }
         }
 
@@ -403,6 +452,7 @@ namespace GameJamOcean.UI
         private void ConfirmTravel(bool toMain)
         {
             ClearPanel(toMain ? "VOLTAR AO MENU?" : "VOLTAR À ILHA?");
+            panel.sizeDelta = new Vector2(panel.sizeDelta.x, 520f);
             Label(SceneManager.GetActiveScene().name == "DiveScene"
                 ? "O mergulho será encerrado.\nVocê mantém o ouro já coletado,\nmas não recebe o baú final ainda fechado."
                 : "Seu ouro e seus upgrades serão mantidos.\nO barco retornará ao ponto inicial junto à ilha.", -130, 22, 120);
@@ -432,6 +482,7 @@ namespace GameJamOcean.UI
         private void ShowSettings()
         {
             ClearPanel("AJUSTES");
+            panel.sizeDelta = new Vector2(panel.sizeDelta.x, 580f);
             SettingSlider("Volume geral", -85, 0f, 1f, AudioListener.volume, value =>
             {
                 AudioListener.volume = value;
@@ -445,6 +496,15 @@ namespace GameJamOcean.UI
                 PlayerPrefs.SetFloat(SettingsKey + "Steering", value);
             });
             Button("Voltar", -450, ShowHome);
+        }
+
+        private static void ExitGame()
+        {
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#else
+            Application.Quit();
+#endif
         }
 
         private void EnsureCanvas()
@@ -488,13 +548,13 @@ namespace GameJamOcean.UI
             GameFontStyles.Apply(label, GameFontRole.General);
             label.text = text; label.fontSize = size; label.alignment = TextAlignmentOptions.Center;
             label.enableAutoSizing = true; label.fontSizeMin = Mathf.Max(10f, size * .72f); label.fontSizeMax = size;
-            label.color = Color.white; label.raycastTarget = false;
+            MakeTextSolid(label);
             return label;
         }
 
-        private void Button(string title, float y, Action action)
+        private void Button(string title, float y, Action action, float width = 440f)
         {
-            var button = EditableUIFactory.CreateButton(title, panelContent, new Vector2(440, 52),
+            var button = EditableUIFactory.CreateButton(title, panelContent, new Vector2(width, 52),
                 new Vector2(0, y), out TMP_Text label, new Color(.1f, .37f, .43f));
             button.onClick.AddListener(() => { if (!loading) action(); });
             GameFontStyles.Apply(label, GameFontRole.General);
@@ -504,8 +564,16 @@ namespace GameJamOcean.UI
             label.fontSizeMin = 16;
             label.fontSizeMax = 23;
             label.alignment = TextAlignmentOptions.Center;
-            label.color = Color.white;
+            MakeTextSolid(label);
             label.raycastTarget = false;
+        }
+
+        private static void MakeTextSolid(TMP_Text label)
+        {
+            if (label == null) return;
+            label.color = new Color(1f, 1f, 1f, 1f);
+            label.alpha = 1f;
+            label.enableVertexGradient = false;
         }
 
         private void SettingSlider(string title, float y, float min, float max, float value, Action<float> apply)
@@ -547,6 +615,8 @@ namespace GameJamOcean.UI
         {
             if (instance != this) return;
             SceneManager.sceneLoaded -= OnSceneLoaded;
+            Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
+            if (scaledCursorTexture != null) Destroy(scaledCursorTexture);
             Resume();
             instance = null;
         }

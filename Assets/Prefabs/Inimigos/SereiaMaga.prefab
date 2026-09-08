@@ -249,11 +249,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GameJamOcean.Enemies.EnemyController2D
   target: {fileID: 0}
   movementSpeed: 1.4
-  stoppingDistance: 4
+  stoppingDistance: 5.5
   attackType: 1
   attackRange: 5
   attackDamage: 1
   attackCooldown: 1.3
+  attackSound: {fileID: 0}
+  attackSoundVolume: 1
   onAttack:
     m_PersistentCalls:
       m_Calls: []

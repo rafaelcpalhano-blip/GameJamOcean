@@ -39,7 +39,8 @@ namespace GameJamOcean.Weapons
 
         private void OnGUI()
         {
-            if (Mouse.current == null || dotTexture == null)
+            if (Mouse.current == null || dotTexture == null
+                || GameJamOcean.UI.GameMenus.BlocksGameplay || Time.timeScale <= 0f)
             {
                 return;
             }

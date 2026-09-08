@@ -12,6 +12,9 @@ namespace GameJamOcean.Weapons
         [SerializeField, Min(0f)] private float speed = 5f;
         [SerializeField, Min(0.1f)] private float lifetime = 5f;
         [SerializeField] private bool destroyOnEnvironmentHit = true;
+        [Header("Impact Audio")]
+        [SerializeField] private AudioClip hitSound;
+        [SerializeField, Range(0f, 2f)] private float hitSoundVolume = 1f;
 
         private Rigidbody2D projectileRigidbody;
         private CircleCollider2D projectileCollider;
@@ -64,6 +67,7 @@ namespace GameJamOcean.Weapons
             {
                 hasHit = true;
                 hitHealth.TakeDamage(damage, owner);
+                GameJamOcean.Audio.GameAudio.Instance?.PlayEffect(hitSound, hitSoundVolume);
                 Destroy(gameObject);
                 return;
             }

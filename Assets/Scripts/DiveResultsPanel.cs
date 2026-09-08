@@ -24,8 +24,9 @@ namespace GameJamOcean.Flow
             shade.gameObject.AddComponent<Image>().color = new Color(0, 0.025f, 0.07f, 0.72f);
             var panel = GameJamOcean.UI.EditableUIFactory.CreatePanel(
                 GameJamOcean.UI.EditableUIPanelKind.DiveResultsPanel, canvas.transform,
-                new Vector2(620, 530), new Color(0.025f, 0.12f, 0.18f, 0.98f),
+                new Vector2(620, 580), new Color(0.025f, 0.12f, 0.18f, 0.98f),
                 "Results", out RectTransform content);
+            panel.sizeDelta = new Vector2(620, 580);
             TMP_Text title = Text(content, "Title", new Vector2(560, 50), new Vector2(0, -25), won ? "MERGULHO CONCLUÍDO!" : "FIM DO MERGULHO", 30, Color.white);
             GameJamOcean.UI.GameFontStyles.Apply(title, GameJamOcean.UI.GameFontRole.Display);
             Text(content, "Progress", new Vector2(560, 35), new Vector2(0, -80),

@@ -176,7 +176,7 @@ namespace GameJamOcean.Spawning
                 yield return new WaitForSeconds(replacementDelay);
             }
 
-            int replacementIndex = GetRandomUnusedIndex();
+            int replacementIndex = GetRandomUnusedIndex(usedPointIndex);
             if (replacementIndex >= 0)
             {
                 PersistentActiveIndices.Add(replacementIndex);
@@ -186,12 +186,13 @@ namespace GameJamOcean.Spawning
             activePointCount = instancesByPoint.Count;
         }
 
-        private int GetRandomUnusedIndex()
+        private int GetRandomUnusedIndex(int excludedIndex = -1)
         {
             List<int> availableIndices = new();
             for (int index = 0; index < spawnPoints.Count; index++)
             {
-                if (spawnPoints[index] != null && !PersistentActiveIndices.Contains(index))
+                if (index != excludedIndex && spawnPoints[index] != null
+                    && !PersistentActiveIndices.Contains(index))
                 {
                     availableIndices.Add(index);
                 }

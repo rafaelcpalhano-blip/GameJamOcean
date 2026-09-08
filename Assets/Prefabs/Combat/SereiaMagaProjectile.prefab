@@ -172,3 +172,5 @@ MonoBehaviour:
   speed: 5
   lifetime: 5
   destroyOnEnvironmentHit: 1
+  hitSound: {fileID: 8300000, guid: 34cd640cf6ee7604494c3aefd4324f57, type: 3}
+  hitSoundVolume: 1

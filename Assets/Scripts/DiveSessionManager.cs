@@ -186,7 +186,8 @@ namespace GameJamOcean.Diving
                 {
                     UpgradeKind[] difficultyUpgrades = { UpgradeKind.Island, UpgradeKind.BoatHull,
                         UpgradeKind.DiverHealth, UpgradeKind.DiverSpeed, UpgradeKind.Harpoon };
-                    foreach (UpgradeKind kind in difficultyUpgrades) points += GameProgress.Instance.GetLevel(kind) - 1;
+                    foreach (UpgradeKind kind in difficultyUpgrades)
+                        points += Mathf.Max(0, GameProgress.Instance.GetLevel(kind) - 1);
                 }
                 int[] thresholds = new int[difficultyTiers.Length];
                 for (int i = 0; i < difficultyTiers.Length; i++)
@@ -696,6 +697,7 @@ namespace GameJamOcean.Diving
                         settings != null ? settings.speedMultiplier : 1.5f);
                     break;
             }
+            GameJamOcean.Audio.GameAudio.Instance?.PlayPowerUpCollected();
             Destroy(gameObject);
         }
     }

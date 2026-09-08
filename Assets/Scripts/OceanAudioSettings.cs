@@ -17,6 +17,8 @@ namespace GameJamOcean.Audio
         [Range(0f, 1f)] public float divePauseAmbienceVolume = .12f;
         public AudioClip coinReward;
         [Header("DiveScene Effects")]
+        public AudioClip powerUpCollected;
+        [Range(0f, 2f)] public float powerUpCollectedVolume = 1f;
         public AudioClip chestOpen;
         [Range(0f, 2f)] public float chestOpenVolume = 1f;
         [Range(0f, 2f)] public float bigChestVolumeMultiplier = 1.2f;

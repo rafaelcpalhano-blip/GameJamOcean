@@ -128,12 +128,22 @@ namespace GameJamOcean.Audio
             if (settings != null && settings.coinReward != null)
                 effects.PlayOneShot(settings.coinReward);
         }
+        public void PlayPowerUpCollected() => PlayEffect(settings?.powerUpCollected,
+            settings != null ? settings.powerUpCollectedVolume : 1f);
         private void OnDestroy() { if (Instance == this) Instance = null; }
         // Route future obstacle/dive effects through this source to respect the effects slider.
         public void PlayEffect(AudioClip clip) => PlayEffect(clip, 1f);
         public void PlayEffect(AudioClip clip, float volumeScale)
         {
             if (clip != null) effects.PlayOneShot(clip, Mathf.Clamp(volumeScale, 0f, 2f));
+        }
+        public void PlayUIEffect(AudioClip clip, float volumeScale)
+        {
+            if (clip == null || uiEffects == null) return;
+            uiEffects.Stop();
+            uiEffects.clip = clip;
+            uiEffects.volume = EffectsVolume * Mathf.Clamp(volumeScale, 0f, 1f);
+            uiEffects.Play();
         }
         public void PlayChestOpen(bool bigChest) => PlayEffect(settings?.chestOpen,
             settings == null ? 1f : settings.chestOpenVolume

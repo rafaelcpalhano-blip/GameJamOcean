@@ -1,6 +1,5 @@
 using TMPro;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace GameJamOcean.UI
@@ -23,6 +22,9 @@ namespace GameJamOcean.UI
         [Range(0f, 2f)] public float buttonClickVolume = 1f;
         public AudioClip buttonHoverSound;
         [Range(0f, 2f)] public float buttonHoverVolume = .6f;
+        [Header("Game Cursor")]
+        public Texture2D gameCursor;
+        public Vector2 cursorHotspot = Vector2.zero;
 
         public GameObject Panel(EditableUIPanelKind kind) => kind switch
         {
@@ -33,42 +35,6 @@ namespace GameJamOcean.UI
             EditableUIPanelKind.TutorialPanel => tutorialPanelPrefab,
             _ => null
         };
-    }
-
-    [DisallowMultipleComponent]
-    public sealed class EditableUIPanelTemplate : MonoBehaviour
-    {
-        [SerializeField] private RectTransform runtimeContent;
-        public RectTransform RuntimeContent => runtimeContent;
-        public void Configure(RectTransform content) => runtimeContent = content;
-    }
-
-    [DisallowMultipleComponent]
-    public sealed class UIButtonAudioFeedback : MonoBehaviour, IPointerEnterHandler
-    {
-        private Button button;
-        private EditableUISettings settings;
-
-        private void Awake()
-        {
-            settings = Resources.Load<EditableUISettings>("EditableUISettings");
-            button = GetComponent<Button>();
-            if (button != null) button.onClick.AddListener(PlayClick);
-        }
-
-        private void PlayClick()
-        {
-            if (settings != null)
-                GameJamOcean.Audio.GameAudio.Instance?.PlayEffect(
-                    settings.buttonClickSound, settings.buttonClickVolume);
-        }
-
-        public void OnPointerEnter(PointerEventData eventData)
-        {
-            if (settings != null && button != null && button.interactable)
-                GameJamOcean.Audio.GameAudio.Instance?.PlayEffect(
-                    settings.buttonHoverSound, settings.buttonHoverVolume);
-        }
     }
 
     public static class EditableUIFactory

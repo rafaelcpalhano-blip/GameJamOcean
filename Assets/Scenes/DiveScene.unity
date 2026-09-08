@@ -3055,6 +3055,8 @@ MonoBehaviour:
   deceleration: 14
   hitImmunitySeconds: 1.5
   hitBlinks: 3
+  damageSound: {fileID: 8300000, guid: e1cbe4dbceca15149ab6269607a9c7f6, type: 3}
+  damageSoundVolume: 1
   dashCooldown: 5
   dashSteeringAngle: 30
   dashSteeringSpeed: 240

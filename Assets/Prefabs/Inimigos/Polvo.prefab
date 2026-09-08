@@ -229,7 +229,8 @@ MonoBehaviour:
   onAttack:
     m_PersistentCalls:
       m_Calls: []
-  attackSound: {fileID: 0}
+  attackSound: {fileID: 8300000, guid: 4d6a26e2ddbf1b349a5f760205f6e815, type: 3}
+  attackSoundVolume: 1
   onEnemyDied:
     m_PersistentCalls:
       m_Calls: []

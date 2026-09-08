@@ -18,7 +18,9 @@ MonoBehaviour:
   diveResultsPanelPrefab: {fileID: 8645749128544026911, guid: 5702ab30bb092954ca02a2eefeddc432, type: 3}
   tutorialPanelPrefab: {fileID: 8781974769773936525, guid: 280b1aba160b98048b37700abc514787, type: 3}
   buttonPrefab: {fileID: 1270395001985585675, guid: 2083cb0334da85a49bd8ae32436fdfd9, type: 3}
-  buttonClickSound: {fileID: 0}
-  buttonClickVolume: 1
-  buttonHoverSound: {fileID: 0}
-  buttonHoverVolume: 0.6
+  buttonClickSound: {fileID: 8300000, guid: c00584945934d7b438c3b0f64124e5f2, type: 3}
+  buttonClickVolume: 0.5
+  buttonHoverSound: {fileID: 8300000, guid: e63d8f5a740581a4687dd9d5f7e16b7a, type: 3}
+  buttonHoverVolume: 0.3
+  gameCursor: {fileID: 2800000, guid: f75349a286817b6479976a10636d3b2c, type: 3}
+  cursorHotspot: {x: 0, y: 0}
