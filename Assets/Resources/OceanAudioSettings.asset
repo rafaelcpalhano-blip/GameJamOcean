@@ -13,6 +13,11 @@ MonoBehaviour:
   m_Name: OceanAudioSettings
   m_EditorClassIdentifier: Assembly-CSharp::GameJamOcean.Audio.OceanAudioSettings
   oceanAmbience: {fileID: 8300000, guid: e3a8d45612da4624cb7f92d756639be1, type: 3}
+  oceanAmbienceVolume: 0.65
+  oceanMusic: {fileID: 8300000, guid: 872455cc7cdca2c49a95dec55f4333bf, type: 3}
+  oceanMusicVolume: 0.5
+  diveMusic: {fileID: 8300000, guid: 47d75bcd7e56e8e46b562fb3447578c8, type: 3}
+  diveMusicVolume: 0.5
   panelOpen: {fileID: 8300000, guid: a04180208ff43074fa72f42f8e61983b, type: 3}
   writing: {fileID: 8300000, guid: 7bdec05c3629e5b48a26af04aca74b55, type: 3}
   harpoonShot: {fileID: 8300000, guid: 2be5e56fb0c99144484b0d79a21e6d18, type: 3}
@@ -21,6 +26,10 @@ MonoBehaviour:
   divePauseAmbience: {fileID: 8300000, guid: 7b185606de4bbde49a7e2564de53d5b3, type: 3}
   divePauseAmbienceVolume: 0.12
   coinReward: {fileID: 8300000, guid: cbf1eb4627d04d8c92dbe6de3c6633d0, type: 3}
+  coinCollected: {fileID: 8300000, guid: f67c04f7990e7014fa312a15d47a55ab, type: 3}
+  coinCollectedVolume: 1
+  coinCounting: {fileID: 8300000, guid: 4f8a63e1d3fefa948a729cbda71bc62e, type: 3}
+  coinCountingVolume: 1
   powerUpCollected: {fileID: 8300000, guid: eb6e5524cd574d744aab1235a066daa5, type: 3}
   powerUpCollectedVolume: 1
   chestOpen: {fileID: 8300000, guid: f4eea8ac23361ae48b1fbca1d64e6009, type: 3}
@@ -51,4 +60,4 @@ MonoBehaviour:
   randomMinimumInterval: 2
   randomMaximumInterval: 5
   randomAmbienceGain: 0.6
-  ambienceGain: 0.65
+  diveAmbienceVolume: 0.65

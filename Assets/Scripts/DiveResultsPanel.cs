@@ -10,7 +10,6 @@ namespace GameJamOcean.Flow
     {
         public void Show(DiveSessionManager session, bool won, int total, Sprite coin, Action onContinue)
         {
-            GameJamOcean.Audio.GameAudio.Instance?.PlayCoinReward();
             var canvasObject = new GameObject("Dive Results Canvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             canvasObject.transform.SetParent(transform, false);
             var canvas = canvasObject.GetComponent<Canvas>();
@@ -54,13 +53,25 @@ namespace GameJamOcean.Flow
         {
             total = Mathf.Max(0, total);
             if (total == 0) yield break;
-            float stepDelay = 4f / total;
-            for (int value = 1; value <= total; value++)
+            const float duration = 2f;
+            GameJamOcean.Audio.GameAudio.Instance?.StartCoinCounting();
+            float elapsed = 0f;
+            int displayed = 0;
+            while (elapsed < duration)
             {
-                if (label == null) yield break;
-                label.text = $"TOTAL RECEBIDO: {value} OURO";
-                yield return new WaitForSecondsRealtime(stepDelay);
+                if (label == null)
+                {
+                    GameJamOcean.Audio.GameAudio.Instance?.StopCoinCounting();
+                    yield break;
+                }
+                elapsed += Time.unscaledDeltaTime;
+                int target = Mathf.Min(total, Mathf.FloorToInt(total * Mathf.Clamp01(elapsed / duration)));
+                while (displayed < target) displayed++;
+                label.text = $"TOTAL RECEBIDO: {displayed} OURO";
+                yield return null;
             }
+            if (label != null) label.text = $"TOTAL RECEBIDO: {total} OURO";
+            GameJamOcean.Audio.GameAudio.Instance?.StopCoinCounting();
         }
 
         private static void Row(Transform parent, Sprite icon, string description, int gold, float y)

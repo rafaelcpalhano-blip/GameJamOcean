@@ -6,7 +6,8 @@ namespace GameJamOcean.Audio
     public sealed class GameAudio : MonoBehaviour
     {
         private OceanAudioSettings settings;
-        private AudioSource ambience, effects, uiEffects, randomAmbience, engine, boatTurbo, divePauseAmbience;
+        private AudioSource ambience, sceneMusic, effects, uiEffects, uiClickEffects, randomAmbience,
+            engine, boatTurbo, divePauseAmbience, coinCounting;
         public static GameAudio Instance { get; private set; }
         private Coroutine randomSounds;
         private Coroutine letterSounds;
@@ -28,16 +29,22 @@ namespace GameJamOcean.Audio
             Instance = this;
             settings = Resources.Load<OceanAudioSettings>("OceanAudioSettings");
             ambience = gameObject.AddComponent<AudioSource>();
+            sceneMusic = gameObject.AddComponent<AudioSource>();
             effects = gameObject.AddComponent<AudioSource>();
             uiEffects = gameObject.AddComponent<AudioSource>();
+            uiClickEffects = gameObject.AddComponent<AudioSource>();
             randomAmbience = gameObject.AddComponent<AudioSource>();
             engine = gameObject.AddComponent<AudioSource>();
             boatTurbo = gameObject.AddComponent<AudioSource>();
             divePauseAmbience = gameObject.AddComponent<AudioSource>();
-            uiEffects.playOnAwake = randomAmbience.playOnAwake = false;
-            uiEffects.spatialBlend = randomAmbience.spatialBlend = 0f;
+            coinCounting = gameObject.AddComponent<AudioSource>();
+            uiEffects.playOnAwake = uiClickEffects.playOnAwake = randomAmbience.playOnAwake = false;
+            uiEffects.spatialBlend = uiClickEffects.spatialBlend = randomAmbience.spatialBlend = 0f;
             ambience.playOnAwake = effects.playOnAwake = false;
             ambience.loop = true;
+            sceneMusic.loop = true;
+            sceneMusic.playOnAwake = false;
+            sceneMusic.spatialBlend = 0f;
             engine.loop = true;
             engine.playOnAwake = false;
             engine.spatialBlend = 0f;
@@ -48,8 +55,12 @@ namespace GameJamOcean.Audio
             divePauseAmbience.playOnAwake = false;
             divePauseAmbience.spatialBlend = 0f;
             divePauseAmbience.ignoreListenerPause = true;
+            coinCounting.loop = true;
+            coinCounting.playOnAwake = false;
+            coinCounting.spatialBlend = 0f;
             ambience.spatialBlend = effects.spatialBlend = 0f;
             uiEffects.ignoreListenerPause = true; // Only letters bypass pause, never combat audio.
+            uiClickEffects.ignoreListenerPause = true;
             SetBackground(PlayerPrefs.GetFloat("GameJamOcean.Settings.Background", 1f));
             SetEffects(PlayerPrefs.GetFloat("GameJamOcean.Settings.Effects", 1f));
         }
@@ -58,12 +69,20 @@ namespace GameJamOcean.Audio
             // Loop is the primary mechanism; this also recovers after WebGL focus/audio-context interruptions.
             if (ambience != null && ambience.clip != null && !ambience.isPlaying && !AudioListener.pause)
                 ambience.Play();
+            if (sceneMusic != null && sceneMusic.clip != null && !sceneMusic.isPlaying && !AudioListener.pause)
+                sceneMusic.Play();
             UpdateEngineVolume();
         }
         public void SetBackground(float value)
         {
             BackgroundVolume = Mathf.Clamp01(value);
-            ambience.volume = BackgroundVolume * (settings != null ? settings.ambienceGain : 1f);
+            string scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            float ambienceVolume = settings == null ? 1f : scene == "DiveScene"
+                ? settings.diveAmbienceVolume : settings.oceanAmbienceVolume;
+            ambience.volume = BackgroundVolume * ambienceVolume;
+            float musicVolume = settings == null ? 1f : scene == "DiveScene"
+                ? settings.diveMusicVolume : settings.oceanMusicVolume;
+            sceneMusic.volume = BackgroundVolume * musicVolume;
             randomAmbience.volume = BackgroundVolume * (settings != null ? settings.randomAmbienceGain : 1f);
             PlayerPrefs.SetFloat("GameJamOcean.Settings.Background", BackgroundVolume);
         }
@@ -72,6 +91,9 @@ namespace GameJamOcean.Audio
             EffectsVolume = Mathf.Clamp01(value);
             effects.volume = EffectsVolume;
             uiEffects.volume = EffectsVolume;
+            uiClickEffects.volume = EffectsVolume;
+            if (coinCounting != null && settings != null)
+                coinCounting.volume = EffectsVolume * settings.coinCountingVolume;
             RefreshEngineVolume();
             RefreshBoatTurboVolume();
             if (divePauseAmbience != null && divePauseAmbience.isPlaying && settings != null)
@@ -84,15 +106,21 @@ namespace GameJamOcean.Audio
             randomSounds = null;
             randomAmbience.Stop();
             effects.Stop();
+            coinCounting.Stop();
             StopBoatTurboImmediately();
             SetDivePauseAmbience(false);
             if (scene != "OceanScene_3D") StopBoatEngine();
             if (settings == null) { ambience.Stop(); return; }
             AudioClip next = scene == "OceanScene_3D" ? settings.oceanAmbience
                 : scene == "DiveScene" ? settings.diveAmbience : null;
+            AudioClip nextMusic = scene == "OceanScene_3D" ? settings.oceanMusic
+                : scene == "DiveScene" ? settings.diveMusic : null;
             if (next != ambience.clip) { ambience.Stop(); ambience.clip = next; }
-            if (next == null) return;
-            if (!ambience.isPlaying) ambience.Play();
+            if (nextMusic != sceneMusic.clip) { sceneMusic.Stop(); sceneMusic.clip = nextMusic; }
+            SetBackground(BackgroundVolume);
+            if (next != null && !ambience.isPlaying) ambience.Play();
+            if (nextMusic != null && !sceneMusic.isPlaying) sceneMusic.Play();
+            if (next == null && nextMusic == null) return;
             if (scene == "OceanScene_3D")
             {
                 int boatLevel = GameJamOcean.Progression.GameProgress.HasInstance
@@ -105,6 +133,7 @@ namespace GameJamOcean.Audio
         public void EnsureAmbiencePlaying()
         {
             if (ambience.clip != null && !ambience.isPlaying) ambience.Play();
+            if (sceneMusic.clip != null && !sceneMusic.isPlaying) sceneMusic.Play();
         }
         private IEnumerator RandomDiveSounds()
         {
@@ -128,6 +157,20 @@ namespace GameJamOcean.Audio
             if (settings != null && settings.coinReward != null)
                 effects.PlayOneShot(settings.coinReward);
         }
+        public void PlayCoinCollected() => PlayEffect(settings?.coinCollected,
+            settings != null ? settings.coinCollectedVolume : 1f);
+        public void StartCoinCounting()
+        {
+            if (settings == null || coinCounting == null || settings.coinCounting == null) return;
+            coinCounting.Stop();
+            coinCounting.clip = settings.coinCounting;
+            coinCounting.volume = EffectsVolume * settings.coinCountingVolume;
+            coinCounting.Play();
+        }
+        public void StopCoinCounting()
+        {
+            if (coinCounting != null) coinCounting.Stop();
+        }
         public void PlayPowerUpCollected() => PlayEffect(settings?.powerUpCollected,
             settings != null ? settings.powerUpCollectedVolume : 1f);
         private void OnDestroy() { if (Instance == this) Instance = null; }
@@ -137,13 +180,18 @@ namespace GameJamOcean.Audio
         {
             if (clip != null) effects.PlayOneShot(clip, Mathf.Clamp(volumeScale, 0f, 2f));
         }
-        public void PlayUIEffect(AudioClip clip, float volumeScale)
+        public void PlayUIButtonHover(AudioClip clip, float volumeScale)
         {
             if (clip == null || uiEffects == null) return;
             uiEffects.Stop();
             uiEffects.clip = clip;
             uiEffects.volume = EffectsVolume * Mathf.Clamp(volumeScale, 0f, 1f);
             uiEffects.Play();
+        }
+        public void PlayUIButtonClick(AudioClip clip, float volumeScale)
+        {
+            if (clip == null || uiClickEffects == null) return;
+            uiClickEffects.PlayOneShot(clip, Mathf.Clamp(volumeScale, 0f, 1f));
         }
         public void PlayChestOpen(bool bigChest) => PlayEffect(settings?.chestOpen,
             settings == null ? 1f : settings.chestOpenVolume

@@ -239,15 +239,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 61f612c5560aca04ea06ff3a44c563da, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameJamOcean.Diving.DiveSessionManager
-  totalEnemies: 27
+  totalEnemies: 18
   difficultyLevel: 0
   beginAutomatically: 1
   registerEnemiesAlreadyInScene: 1
   useUpgradeDifficulty: 1
   difficultyTiers:
   - minimumPurchasedUpgrades: 0
-    initialEnemies: 10
-    totalEnemies: 27
+    initialEnemies: 6
+    totalEnemies: 18
     enemyWeights: [40, 30, 20, 5, 5]
   - minimumPurchasedUpgrades: 3
     initialEnemies: 12

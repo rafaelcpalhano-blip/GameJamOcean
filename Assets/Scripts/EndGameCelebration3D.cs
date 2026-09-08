@@ -33,6 +33,7 @@ namespace GameJamOcean.Progression
             boat = FindFirstObjectByType<BoatController3D>();
             boatWasEnabled = boat != null && boat.enabled;
             if (boat != null) boat.enabled = false;
+            GameJamOcean.Audio.GameAudio.Instance?.SetBoatEngineTemporarilyMuted(true);
 
             Vector3 center = finalVillage != null ? finalVillage.transform.position : Vector3.zero;
             if (finalVillage != null)
@@ -71,11 +72,16 @@ namespace GameJamOcean.Progression
             }
             cameraFollow?.EndEndGameOrbit();
             if (boat != null && boatWasEnabled) boat.enabled = true;
+            GameJamOcean.Audio.GameAudio.Instance?.SetBoatEngineTemporarilyMuted(false);
             GameJamOcean.UI.GameMenus.EndGameActive = false;
             Destroy(gameObject);
         }
 
-        private void OnDestroy() => GameJamOcean.UI.GameMenus.EndGameActive = false;
+        private void OnDestroy()
+        {
+            GameJamOcean.Audio.GameAudio.Instance?.SetBoatEngineTemporarilyMuted(false);
+            GameJamOcean.UI.GameMenus.EndGameActive = false;
+        }
 
         private void BuildUI()
         {

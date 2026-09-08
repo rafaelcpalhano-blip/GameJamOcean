@@ -136,7 +136,9 @@ namespace GameJamOcean.Progression
         {
             firstDeathFree = boatDestructions == 0;
             boatDestructions++;
-            chargedGold = firstDeathFree ? 0 : Mathf.Min(totalGold, Mathf.Max(0, cost));
+            int configuredCost = Mathf.Max(0, cost);
+            chargedGold = firstDeathFree ? 0
+                : totalGold >= configuredCost ? configuredCost : totalGold / 2;
             if (chargedGold > 0)
             {
                 totalGold -= chargedGold;

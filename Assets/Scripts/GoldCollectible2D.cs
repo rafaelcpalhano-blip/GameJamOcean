@@ -105,6 +105,7 @@ namespace GameJamOcean.Collectibles
             collected = true;
             collectibleCollider.enabled = false;
             sessionManager.AddCollectedCoinGold(goldValue);
+            GameJamOcean.Audio.GameAudio.Instance?.PlayCoinCollected();
 
             if (collectionEffectPrefab != null)
             {

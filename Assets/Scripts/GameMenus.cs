@@ -184,14 +184,14 @@ namespace GameJamOcean.UI
             {
                 if (scaledCursorTexture != null) Destroy(scaledCursorTexture);
                 cursorSource = source;
-                scaledCursorTexture = source != null ? CreateScaledCursor(source, 4) : null;
+                scaledCursorTexture = source != null ? CreateScaledCursor(source, 2) : null;
                 customCursorApplied = false;
             }
             Texture2D cursor = scaledCursorTexture;
             if (Cursor.visible && cursor != null)
             {
                 if (customCursorApplied) return;
-                Cursor.SetCursor(cursor, EditableUIFactory.Settings.cursorHotspot * 4f,
+                Cursor.SetCursor(cursor, EditableUIFactory.Settings.cursorHotspot * 2f,
                     CursorMode.ForceSoftware);
                 customCursorApplied = true;
             }
@@ -212,9 +212,10 @@ namespace GameJamOcean.UI
             for (int x = 0; x < width; x++)
                 enlarged[y * width + x] = original[(y / scale) * source.width + x / scale];
             var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
-            { name = source.name + " 4x Cursor", filterMode = FilterMode.Point };
+            { name = source.name + " 2x Cursor", filterMode = FilterMode.Point };
             texture.SetPixels32(enlarged);
-            texture.Apply(false, true);
+            // Cursor.SetCursor requires CPU-readable pixels even after upload.
+            texture.Apply(false, false);
             return texture;
         }
 
@@ -310,9 +311,12 @@ namespace GameJamOcean.UI
             instance.showingLetter = true;
             instance.letterFrame = Time.frameCount;
             instance.ClearPanel("DE VOLTA AO ESTALEIRO", EditableUIPanelKind.TutorialPanel);
+            bool receivedDiscount = !firstDeathFree && chargedGold < configuredCost;
             string message = firstDeathFree
                 ? "Destruir o barco custa mais do que mantê-lo em boas condições, então procure deixar a manutenção em dia. Desta vez, como sua missão é nobre e ajuda o vilarejo a crescer, o primeiro conserto fica por conta da vila."
-                : $"{RescueMessages[UnityEngine.Random.Range(0, RescueMessages.Length)]}\n\nConserto após o naufrágio: {configuredCost} Gold. Valor debitado: {chargedGold} Gold.";
+                : receivedDiscount
+                    ? $"Conserto após o naufrágio: {configuredCost} Gold.\nValor debitado: {chargedGold} Gold.\n\nA vila concedeu um desconto porque sabe que suas finanças não andam boas. A vida no mar não é fácil, mas pode ser muito recompensadora conforme você adquire experiência."
+                    : $"{RescueMessages[UnityEngine.Random.Range(0, RescueMessages.Length)]}\n\nConserto após o naufrágio: {configuredCost} Gold.\nValor debitado: {chargedGold} Gold.";
             TMP_Text body = instance.Label(message, -130, 26, 260);
             instance.Label("Clique ou pressione WASD / setas para continuar", -450, 18);
             instance.gameAudio.StartLetter();
@@ -435,8 +439,9 @@ namespace GameJamOcean.UI
         private void ConfirmNewGame()
         {
             ClearPanel("NOVO JOGO");
+            panel.sizeDelta = new Vector2(panel.sizeDelta.x, 560f);
             Label("Iniciar uma nova aventura?\nO ouro e os upgrades salvos serão substituídos.\nEsta ação não pode ser desfeita.", -130, 22, 120);
-            Button("Sim, iniciar novo jogo", -285, () =>
+            Button("Iniciar novo jogo", -285, () =>
             {
                 if (!CanLoadOcean()) return;
                 GameProgress.Instance.ResetProgress();

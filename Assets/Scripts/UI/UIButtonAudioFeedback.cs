@@ -26,7 +26,7 @@ namespace GameJamOcean.UI
         private void PlayClick()
         {
             if (settings == null || button == null || !button.interactable) return;
-            GameJamOcean.Audio.GameAudio.Instance?.PlayUIEffect(
+            GameJamOcean.Audio.GameAudio.Instance?.PlayUIButtonClick(
                 settings.buttonClickSound, settings.buttonClickVolume);
         }
 
@@ -40,7 +40,7 @@ namespace GameJamOcean.UI
                     colorBeforeHover.b * .72f, colorBeforeHover.a);
                 hoverTintApplied = true;
             }
-            GameJamOcean.Audio.GameAudio.Instance?.PlayUIEffect(
+            GameJamOcean.Audio.GameAudio.Instance?.PlayUIButtonHover(
                 settings.buttonHoverSound, settings.buttonHoverVolume);
         }
 

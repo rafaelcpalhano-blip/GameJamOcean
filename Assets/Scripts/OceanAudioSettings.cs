@@ -5,7 +5,13 @@ namespace GameJamOcean.Audio
     [CreateAssetMenu(menuName = "GameJamOcean/Audio Settings")]
     public sealed class OceanAudioSettings : ScriptableObject
     {
+        [Header("Scene Ambience and Music")]
         public AudioClip oceanAmbience;
+        [Range(0f, 1f)] public float oceanAmbienceVolume = .65f;
+        public AudioClip oceanMusic;
+        [Range(0f, 1f)] public float oceanMusicVolume = .5f;
+        public AudioClip diveMusic;
+        [Range(0f, 1f)] public float diveMusicVolume = .5f;
         public AudioClip panelOpen;
         public AudioClip writing;
         [Header("Diving")]
@@ -16,6 +22,10 @@ namespace GameJamOcean.Audio
         public AudioClip divePauseAmbience;
         [Range(0f, 1f)] public float divePauseAmbienceVolume = .12f;
         public AudioClip coinReward;
+        public AudioClip coinCollected;
+        [Range(0f, 2f)] public float coinCollectedVolume = 1f;
+        public AudioClip coinCounting;
+        [Range(0f, 2f)] public float coinCountingVolume = 1f;
         [Header("DiveScene Effects")]
         public AudioClip powerUpCollected;
         [Range(0f, 2f)] public float powerUpCollectedVolume = 1f;
@@ -54,6 +64,6 @@ namespace GameJamOcean.Audio
         [Min(.1f)] public float randomMinimumInterval = 2f;
         [Min(.1f)] public float randomMaximumInterval = 5f;
         [Range(0f, 1f)] public float randomAmbienceGain = .6f;
-        [Range(0f, 1f)] public float ambienceGain = .65f;
+        [Range(0f, 1f)] public float diveAmbienceVolume = .65f;
     }
 }

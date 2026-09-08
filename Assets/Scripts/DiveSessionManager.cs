@@ -47,7 +47,7 @@ namespace GameJamOcean.Diving
         [SerializeField] private bool useUpgradeDifficulty = true;
         [SerializeField] private DiveDifficultyTier[] difficultyTiers =
         {
-            new(0, 10, 27, 40, 30, 20, 5, 5),
+            new(0, 6, 18, 40, 30, 20, 5, 5),
             new(3, 12, 30, 20, 30, 30, 10, 10),
             new(6, 14, 33, 10, 35, 25, 15, 15),
             new(9, 15, 37, 10, 25, 25, 25, 25),

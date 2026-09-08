@@ -72,11 +72,12 @@ namespace GameJamOcean.Progression
         private float nextPurchaseTime;
         private GameProgress progress;
         private bool firstPierGoldHintShown;
+        private Coroutine statusColorRoutine;
         private readonly Button[] boatButtons = new Button[3];
         private static readonly string[] VillageThanks =
         {
             "",
-            "Os moradores agradecem pelo novo Pier! Para tornar este lugar seguro diante das grandes embarcações, ainda precisaremos evoluir bastante. Nosso objetivo é fazer o farol voltar a brilhar. Será um caminho árduo, mas recompensador.",
+            "Os moradores agradecem pelo novo píer! Para tornar este lugar seguro diante das grandes embarcações, ainda precisamos evoluir bastante. Nosso objetivo é construir um farol e fazê-lo brilhar. Será um caminho árduo, mas recompensador.",
             "A vila está crescendo graças à sua ajuda. Os moradores agradecem por mais este avanço!",
             "Cada melhoria torna nossa comunidade mais forte. Muito obrigado por continuar ao nosso lado!",
             "O farol voltou a brilhar! Todo o vilarejo agradece por você ter tornado este lugar mais seguro."
@@ -137,6 +138,7 @@ namespace GameJamOcean.Progression
             Cursor.visible = true;
             modal.SetActive(true);
             statusLabel.text = progress.IsGameCompleted ? "Aldeia N4 — jogo concluído!" : "Escolha um upgrade. Todos os preços são em ouro.";
+            statusLabel.color = Color.white;
             Refresh();
             if (!firstPierGoldHintShown && progress.GetLevel(UpgradeKind.Island) == 0)
             {
@@ -208,6 +210,10 @@ namespace GameJamOcean.Progression
             statusLabel.text = purchased && kind == UpgradeKind.Island
                 ? VillageThanks[Mathf.Clamp(villageLevel, 1, 4)]
                 : progress.IsGameCompleted ? "Aldeia N4 — jogo concluído!" : message;
+            if (purchased && message == "Upgrade adquirido!")
+                ShowUpgradeAcquiredColor();
+            else
+                statusLabel.color = Color.white;
             Refresh();
             if (!completedBefore && progress.IsGameCompleted)
             {
@@ -300,11 +306,11 @@ namespace GameJamOcean.Progression
                 new Vector2(960, 900), new Color(0.025f, 0.10f, 0.14f, .72f),
                 "Port Upgrades", out RectTransform content);
             panel.sizeDelta = new Vector2(960, 900);
-            TMP_Text title = Label("Title", content, new Vector2(740, 40), new Vector2(-45, -22), "UPGRADES DO PORTO", 30);
+            TMP_Text title = Label("Title", content, new Vector2(650, 40), new Vector2(0, -30), "UPGRADES DO PORTO", 30);
             GameJamOcean.UI.GameFontStyles.Apply(title, GameJamOcean.UI.GameFontRole.Display);
             goldLabel = Label("Gold", content, new Vector2(800, 35), new Vector2(0, -75), "OURO", 24);
             GameJamOcean.UI.GameFontStyles.Apply(goldLabel, GameJamOcean.UI.GameFontRole.Display);
-            Button close = ButtonUI("Close", content, new Vector2(90, 40), new Vector2(400, -22), out TMP_Text closeText);
+            Button close = ButtonUI("Close", content, new Vector2(90, 40), new Vector2(400, -30), out TMP_Text closeText);
             closeText.text = "FECHAR";
             close.onClick.AddListener(Close);
             Image panelBackground = panel.GetComponent<Image>();
@@ -346,6 +352,20 @@ namespace GameJamOcean.Progression
                 boatButtons[level - 1].onClick.AddListener(() => SelectBoat(capturedLevel));
             }
             modal.SetActive(false);
+        }
+
+        private void ShowUpgradeAcquiredColor()
+        {
+            if (statusColorRoutine != null) StopCoroutine(statusColorRoutine);
+            statusColorRoutine = StartCoroutine(ReturnStatusColorToWhite());
+        }
+
+        private System.Collections.IEnumerator ReturnStatusColorToWhite()
+        {
+            statusLabel.color = new Color(.2f, 1f, .35f, 1f);
+            yield return new WaitForSecondsRealtime(1f);
+            if (statusLabel != null) statusLabel.color = Color.white;
+            statusColorRoutine = null;
         }
 
         private void RefreshBoatSelection(bool hide)
