@@ -444,14 +444,14 @@ namespace GameJamOcean.UI
         private void ShowHome()
         {
             if (main) gameAudio.EnsureAmbiencePlaying();
-            ClearPanel(main ? "GAME JAM OCEAN" : "PAUSADO",
+            ClearPanel(main ? string.Empty : "PAUSADO",
                 main ? EditableUIPanelKind.MainMenu : EditableUIPanelKind.PauseMenu);
             if (main)
             {
                 var progress = GameProgress.Instance;
                 bool hasSave = progress != null && progress.HasSavedGame;
                 panel.sizeDelta = new Vector2(panel.sizeDelta.x, hasSave ? 420f : 360f);
-                Label(hasSave ? $"Sua aldeia • nível {progress.GetLevel(UpgradeKind.Island)}" : "Uma nova aventura espera por você", -85, 20);
+                MainMenuLogo();
                 Button(hasSave ? "Continuar" : "Iniciar", -145, () =>
                 {
                     if (hasSave) StartGameplay();
@@ -459,7 +459,7 @@ namespace GameJamOcean.UI
                 }, 360f);
                 if (hasSave) Button("Novo jogo", -210, ConfirmNewGame, 360f);
                 Button("Ajustes", hasSave ? -275 : -215, ShowSettings, 360f);
-                Button("Sair", hasSave ? -340 : -280, ExitGame, 360f);
+                Button("Sair", hasSave ? -340 : -280, ConfirmExitGame, 360f);
             }
             else
             {
@@ -498,6 +498,15 @@ namespace GameJamOcean.UI
                 : "Seu ouro e seus upgrades serão mantidos.\nO barco retornará ao ponto inicial junto à ilha.", -130, 22, 120);
             Button("Confirmar", -285, () => Travel(toMain));
             Button("Cancelar", -355, ShowHome);
+        }
+
+        private void ConfirmExitGame()
+        {
+            ClearPanel("DESEJA SAIR?", EditableUIPanelKind.MainMenu);
+            panel.sizeDelta = new Vector2(panel.sizeDelta.x, 350f);
+            Label("Tem certeza que deseja sair?", -105, 22);
+            Button("Sim, desejo sair", -175, ExitGame, 360f);
+            Button("Vou continuar jogando", -245, ShowHome, 360f);
         }
 
         private bool CanLoadOcean()
@@ -577,9 +586,30 @@ namespace GameJamOcean.UI
                 child.gameObject.SetActive(false);
                 Destroy(child.gameObject);
             }
-            TMP_Text titleLabel = Label(title, -35, 30);
-            GameFontStyles.Apply(titleLabel, GameFontRole.Display);
+            if (!string.IsNullOrWhiteSpace(title))
+            {
+                TMP_Text titleLabel = Label(title, -35, 30);
+                GameFontStyles.Apply(titleLabel, GameFontRole.Display);
+            }
             if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
+        }
+
+        private void MainMenuLogo()
+        {
+            Sprite logo = EditableUIFactory.Settings != null
+                ? EditableUIFactory.Settings.mainMenuLogo : null;
+            if (logo == null)
+            {
+                Debug.LogWarning("Main menu logo is not assigned in EditableUISettings.", this);
+                return;
+            }
+
+            RectTransform logoRect = Rect("Logo Game Campeche", panelContent,
+                new Vector2(340f, 190f), new Vector2(0f, 40f));
+            Image logoImage = logoRect.gameObject.AddComponent<Image>();
+            logoImage.sprite = logo;
+            logoImage.preserveAspect = true;
+            logoImage.raycastTarget = false;
         }
 
         private TMP_Text Label(string text, float y, int size, float height = 45)

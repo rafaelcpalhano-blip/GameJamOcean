@@ -15,6 +15,8 @@ namespace GameJamOcean.UI
         public GameObject upgradePanelPrefab;
         public GameObject diveResultsPanelPrefab;
         public GameObject tutorialPanelPrefab;
+        [Header("Main Menu Logo")]
+        public Sprite mainMenuLogo;
         [Header("Shared Controls")]
         public GameObject buttonPrefab;
         [Header("Button Audio")]
