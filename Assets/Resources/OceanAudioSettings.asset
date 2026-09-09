@@ -13,25 +13,27 @@ MonoBehaviour:
   m_Name: OceanAudioSettings
   m_EditorClassIdentifier: Assembly-CSharp::GameJamOcean.Audio.OceanAudioSettings
   oceanAmbience: {fileID: 8300000, guid: e3a8d45612da4624cb7f92d756639be1, type: 3}
-  oceanAmbienceVolume: 0.65
+  oceanAmbienceVolume: 0.4
   oceanMusic: {fileID: 8300000, guid: 872455cc7cdca2c49a95dec55f4333bf, type: 3}
-  oceanMusicVolume: 0.5
+  oceanMusicVolume: 0.12
   diveMusic: {fileID: 8300000, guid: 47d75bcd7e56e8e46b562fb3447578c8, type: 3}
-  diveMusicVolume: 0.5
+  diveMusicVolume: 0.1
   panelOpen: {fileID: 8300000, guid: a04180208ff43074fa72f42f8e61983b, type: 3}
   writing: {fileID: 8300000, guid: 7bdec05c3629e5b48a26af04aca74b55, type: 3}
   harpoonShot: {fileID: 8300000, guid: 2be5e56fb0c99144484b0d79a21e6d18, type: 3}
   diveAmbience: {fileID: 8300000, guid: 228851c69bfdfb6479768d9755fff634, type: 3}
   diveRandomAmbience: {fileID: 8300000, guid: 35a56db5f356630449b845c2085977c6, type: 3}
   divePauseAmbience: {fileID: 8300000, guid: 7b185606de4bbde49a7e2564de53d5b3, type: 3}
-  divePauseAmbienceVolume: 0.12
+  divePauseAmbienceVolume: 0.1
   coinReward: {fileID: 8300000, guid: cbf1eb4627d04d8c92dbe6de3c6633d0, type: 3}
   coinCollected: {fileID: 8300000, guid: f67c04f7990e7014fa312a15d47a55ab, type: 3}
-  coinCollectedVolume: 1
+  coinCollectedVolume: 0.4
   coinCounting: {fileID: 8300000, guid: 4f8a63e1d3fefa948a729cbda71bc62e, type: 3}
-  coinCountingVolume: 1
+  coinCountingVolume: 2
+  coinCountingGainMultiplier: 2
+  coinCountingTargetDuration: 2
   powerUpCollected: {fileID: 8300000, guid: eb6e5524cd574d744aab1235a066daa5, type: 3}
-  powerUpCollectedVolume: 1
+  powerUpCollectedVolume: 0.8
   chestOpen: {fileID: 8300000, guid: f4eea8ac23361ae48b1fbca1d64e6009, type: 3}
   chestOpenVolume: 2
   bigChestVolumeMultiplier: 2
@@ -39,14 +41,14 @@ MonoBehaviour:
   aquaticDashVolume: 1.2
   enemyDashVolumeMultiplier: 0.65
   villageConstruction: {fileID: 8300000, guid: a75c870d06190b840b653cfeb4644e45, type: 3}
-  villageConstructionVolume: 0.5
+  villageConstructionVolume: 0.4
   boatTurbo: {fileID: 8300000, guid: 3a9c3dcbbbeb74b41b22e6316be833c4, type: 3}
   boatTurboVolume: 0.08
   boatTurboFadeOutSeconds: 0.15
   boatUpgrade: {fileID: 8300000, guid: d67787305ad6e2941a725c808c57e8b8, type: 3}
-  boatUpgradeVolume: 1
+  boatUpgradeVolume: 0.9
   diverWaterJump: {fileID: 8300000, guid: 6bb7f8253c11a574cabb7511c268090a, type: 3}
-  diverWaterJumpVolume: 1
+  diverWaterJumpVolume: 0.6
   boatCollision: {fileID: 8300000, guid: 0f272ff939b36534b99e3c848c800701, type: 3}
   boatCollisionVolume: 1
   boat1Engine: {fileID: 8300000, guid: 6d1a173b49bf6f54a9c24a897a6cddca, type: 3}
@@ -69,7 +71,8 @@ MonoBehaviour:
   tornadoSound: {fileID: 8300000, guid: a20b285596d78184cb7581b7ec31953d, type: 3}
   tornadoSoundVolume: 0.7
   tornadoSoundMinimumDistance: 3
-  tornadoSoundMaximumDistance: 18
+  tornadoSoundMaximumDistance: 15
+  tornadoIslandClearance: 4
   tornadoCount: 6
   tornadoMinimumActive: 3
   tornadoSpeed: 2
@@ -84,6 +87,14 @@ MonoBehaviour:
   tornadoSpiralDuration: 1.75
   tornadoLaunchSpeed: 9
   tornadoLaunchControlLockSeconds: 0.6
+  tornadoBuoyCaptureRadius: 2.5
+  tornadoBuoySpiralDuration: 1.5
+  tornadoBuoyLaunchSpeed: 8
+  tornadoBuoyLaunchUpSpeed: 7
+  tornadoBuoyDestructionDelay: 2.5
+  tornadoBuoyTargetMinimumInterval: 12
+  tornadoBuoyTargetMaximumInterval: 20
+  tornadoBuoyTargetMaximumTravelTime: 8
   tornadoBoat1Damage: 20
   tornadoBoat2Damage: 15
   tornadoBoat3Damage: 10
@@ -106,3 +117,7 @@ MonoBehaviour:
     - {x: 0.16, y: 0.7}
     - {x: 0.38, y: 0.86}
     - {x: 0.52, y: 0.68}
+  sharkDrama: {fileID: 8300000, guid: d91a583c4f8940a7a1f77bb3642454c8, type: 3}
+  sharkDramaVolume: 0.7
+  sharkDramaFadeOutSeconds: 0.5
+  sharkDramaEscapeFadeOutSeconds: 0.2

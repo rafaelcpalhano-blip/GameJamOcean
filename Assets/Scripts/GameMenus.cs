@@ -321,6 +321,7 @@ namespace GameJamOcean.UI
                     ? $"Conserto após o naufrágio: {configuredCost} Gold.\nValor debitado: {chargedGold} Gold.\n\nA vila concedeu um desconto porque sabe que suas finanças não andam boas. A vida no mar não é fácil, mas pode ser muito recompensadora conforme você adquire experiência."
                     : $"{RescueMessages[UnityEngine.Random.Range(0, RescueMessages.Length)]}\n\nConserto após o naufrágio: {configuredCost} Gold.\nValor debitado: {chargedGold} Gold.";
             TMP_Text body = instance.Label(message, -130, 26, 260);
+            body.rectTransform.sizeDelta = new Vector2(480f, body.rectTransform.sizeDelta.y);
             instance.gameAudio.StartLetter();
             instance.BeginTypewriter(body);
             instance.PrepareContinuePrompt(-450);

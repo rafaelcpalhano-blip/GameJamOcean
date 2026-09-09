@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using GameJamOcean.Audio;
 using GameJamOcean.Boat;
 using GameJamOcean.Combat;
@@ -84,6 +85,9 @@ namespace GameJamOcean.World
     {
         private static OceanAudioSettings settings;
         private int activeTornadoes;
+        private Bounds navigableBounds;
+        private DiveSpawnExclusionCircle3D[] tornadoExclusions;
+        private readonly List<TornadoPatrol3D> tornadoControllers = new();
 
         public static void ConfigureScene(Scene scene)
         {
@@ -125,34 +129,140 @@ namespace GameJamOcean.World
                 bounds = new Bounds(center, new Vector3(100f, 1f, 100f));
             }
             float waterY = boat != null ? boat.transform.position.y : bounds.center.y;
-            DiveSpawnExclusionCircle3D[] exclusions = FindObjectsByType<DiveSpawnExclusionCircle3D>(
+            navigableBounds = bounds;
+            tornadoExclusions = FindObjectsByType<DiveSpawnExclusionCircle3D>(
                 FindObjectsInactive.Exclude, FindObjectsSortMode.None);
             int tornadoCount = Mathf.Max(1, settings.tornadoCount);
             int minimumActive = Mathf.Clamp(settings.tornadoMinimumActive, 1, tornadoCount);
             for (int i = 0; i < tornadoCount; i++)
             {
-                Vector3[] points = new Vector3[3];
-                for (int point = 0; point < points.Length; point++)
-                    points[point] = RandomWaterPoint(bounds, waterY + settings.tornadoWaterOffset, exclusions);
+                Vector3[] points = CreateRandomRoute(waterY + settings.tornadoWaterOffset);
                 GameObject routeObject = new($"Tornado Route {i + 1}");
                 routeObject.transform.SetParent(transform, false);
-                routeObject.AddComponent<TornadoPatrol3D>().Configure(this, settings, points, i < minimumActive);
+                TornadoPatrol3D controller = routeObject.AddComponent<TornadoPatrol3D>();
+                tornadoControllers.Add(controller);
+                controller.Configure(this, settings, points, i < minimumActive);
+            }
+            StartCoroutine(TargetDivePointsPeriodically());
+        }
+
+        private IEnumerator TargetDivePointsPeriodically()
+        {
+            while (true)
+            {
+                float minimum = Mathf.Max(.1f, settings.tornadoBuoyTargetMinimumInterval);
+                float maximum = Mathf.Max(minimum, settings.tornadoBuoyTargetMaximumInterval);
+                yield return new WaitForSeconds(Random.Range(minimum, maximum));
+                while (!TryAssignDivePointTarget()) yield return new WaitForSeconds(1f);
             }
         }
 
-        private static Vector3 RandomWaterPoint(Bounds bounds, float y, DiveSpawnExclusionCircle3D[] exclusions)
+        private bool TryAssignDivePointTarget()
         {
-            Vector3 candidate = bounds.center;
+            List<TornadoPatrol3D> availableTornadoes = new();
+            foreach (TornadoPatrol3D tornado in tornadoControllers)
+                if (tornado != null && tornado.IsVisible && !tornado.HasDivePointTarget)
+                    availableTornadoes.Add(tornado);
+            List<SpawnedDivePoint3D> availablePoints = new();
+            foreach (SpawnedDivePoint3D point in SpawnedDivePoint3D.ActivePoints)
+            {
+                if (point == null || !point.IsAvailableForTornado) continue;
+                bool alreadyTargeted = false;
+                foreach (TornadoPatrol3D tornado in tornadoControllers)
+                    if (tornado != null && tornado.TargetedDivePoint == point) { alreadyTargeted = true; break; }
+                if (!alreadyTargeted) availablePoints.Add(point);
+            }
+            if (availableTornadoes.Count == 0 || availablePoints.Count == 0) return false;
+            SpawnedDivePoint3D selectedPoint = availablePoints[Random.Range(0, availablePoints.Count)];
+            TornadoPatrol3D selectedTornado = availableTornadoes[0];
+            float nearestDistance = float.PositiveInfinity;
+            for (int index = 0; index < availableTornadoes.Count; index++)
+            {
+                float distance = (availableTornadoes[index].transform.position - selectedPoint.transform.position)
+                    .sqrMagnitude;
+                if (distance >= nearestDistance || !SegmentIsClear(availableTornadoes[index].transform.position,
+                        selectedPoint.transform.position, settings.tornadoIslandClearance + .25f)) continue;
+                nearestDistance = distance;
+                selectedTornado = availableTornadoes[index];
+            }
+            if (float.IsPositiveInfinity(nearestDistance)) return false;
+            return selectedTornado.TryTargetDivePoint(selectedPoint);
+        }
+
+        private Vector3[] CreateRandomRoute(float y)
+        {
+            float safeMargin = settings.tornadoIslandClearance + settings.tornadoZigzagAmplitude;
+            for (int routeAttempt = 0; routeAttempt < 48; routeAttempt++)
+            {
+                Vector3[] route = { RandomWaterPoint(y, safeMargin), RandomWaterPoint(y, safeMargin),
+                    RandomWaterPoint(y, safeMargin) };
+                if (SegmentIsClear(route[0], route[1], safeMargin)
+                    && SegmentIsClear(route[1], route[2], safeMargin)
+                    && SegmentIsClear(route[2], route[0], safeMargin)) return route;
+            }
+            return new[] { RandomWaterPoint(y, safeMargin), RandomWaterPoint(y, safeMargin),
+                RandomWaterPoint(y, safeMargin) };
+        }
+
+        private Vector3 RandomWaterPoint(float y, float clearance)
+        {
+            Vector3 candidate = navigableBounds.center;
             for (int attempt = 0; attempt < 24; attempt++)
             {
-                candidate = new Vector3(Random.Range(bounds.min.x, bounds.max.x), y,
-                    Random.Range(bounds.min.z, bounds.max.z));
-                bool blocked = false;
-                foreach (DiveSpawnExclusionCircle3D exclusion in exclusions)
-                    if (exclusion != null && exclusion.ContainsXZ(candidate)) { blocked = true; break; }
-                if (!blocked) return candidate;
+                candidate = new Vector3(Random.Range(navigableBounds.min.x, navigableBounds.max.x), y,
+                    Random.Range(navigableBounds.min.z, navigableBounds.max.z));
+                if (PositionIsClear(candidate, clearance)) return candidate;
             }
             candidate.y = y;
+            return ConstrainTornadoPosition(candidate);
+        }
+
+        private bool PositionIsClear(Vector3 candidate, float clearance)
+        {
+            foreach (DiveSpawnExclusionCircle3D exclusion in tornadoExclusions)
+            {
+                if (exclusion == null) continue;
+                Vector2 delta = new(candidate.x - exclusion.transform.position.x,
+                    candidate.z - exclusion.transform.position.z);
+                float radius = exclusion.Radius + clearance;
+                if (delta.sqrMagnitude < radius * radius) return false;
+            }
+            return true;
+        }
+
+        private bool SegmentIsClear(Vector3 start, Vector3 end, float clearance)
+        {
+            Vector2 a = new(start.x, start.z);
+            Vector2 b = new(end.x, end.z);
+            Vector2 segment = b - a;
+            float lengthSquared = segment.sqrMagnitude;
+            foreach (DiveSpawnExclusionCircle3D exclusion in tornadoExclusions)
+            {
+                if (exclusion == null) continue;
+                Vector2 center = new(exclusion.transform.position.x, exclusion.transform.position.z);
+                float t = lengthSquared > .001f ? Mathf.Clamp01(Vector2.Dot(center - a, segment) / lengthSquared) : 0f;
+                float radius = exclusion.Radius + clearance;
+                if ((a + segment * t - center).sqrMagnitude < radius * radius) return false;
+            }
+            return true;
+        }
+
+        public Vector3 ConstrainTornadoPosition(Vector3 candidate)
+        {
+            candidate.x = Mathf.Clamp(candidate.x, navigableBounds.min.x, navigableBounds.max.x);
+            candidate.z = Mathf.Clamp(candidate.z, navigableBounds.min.z, navigableBounds.max.z);
+            foreach (DiveSpawnExclusionCircle3D exclusion in tornadoExclusions)
+            {
+                if (exclusion == null) continue;
+                Vector2 delta = new(candidate.x - exclusion.transform.position.x,
+                    candidate.z - exclusion.transform.position.z);
+                float radius = exclusion.Radius + settings.tornadoIslandClearance;
+                if (delta.sqrMagnitude >= radius * radius) continue;
+                if (delta.sqrMagnitude < .001f) delta = Vector2.right;
+                delta = delta.normalized * radius;
+                candidate.x = exclusion.transform.position.x + delta.x;
+                candidate.z = exclusion.transform.position.z + delta.y;
+            }
             return candidate;
         }
 
@@ -176,6 +286,7 @@ namespace GameJamOcean.World
         private SphereCollider contact;
         private GameObject visual;
         private AudioSource tornadoAudio;
+        private AudioSource tornadoAudioBoost;
         private float nextDamageTime;
         private static TornadoPatrol3D captureOwner;
         private bool capturing;
@@ -184,10 +295,16 @@ namespace GameJamOcean.World
         private float captureStartAngle;
         private float captureDirection;
         private Quaternion captureRotation;
+        private int activeBuoyCaptures;
+        private SpawnedDivePoint3D targetedDivePoint;
+        private float targetedDivePointSpeed;
 
         private BoatController3D boat;
         private Rigidbody boatBody;
         private Health boatHealth;
+        public bool IsVisible => contact != null && contact.enabled;
+        public bool HasDivePointTarget => targetedDivePoint != null;
+        public SpawnedDivePoint3D TargetedDivePoint => targetedDivePoint;
 
         public void Configure(OceanVfxScene3D owner, OceanAudioSettings configuration, Vector3[] route,
             bool showImmediately)
@@ -208,7 +325,60 @@ namespace GameJamOcean.World
             contact.isTrigger = true;
             contact.radius = settings.tornadoColliderRadius;
             contact.enabled = false;
+            ConfigureSpatialAudio();
             StartCoroutine(Patrol(showImmediately));
+        }
+
+        private void ConfigureSpatialAudio()
+        {
+            tornadoAudio = gameObject.AddComponent<AudioSource>();
+            tornadoAudioBoost = gameObject.AddComponent<AudioSource>();
+            ConfigureSpatialSource(tornadoAudio);
+            ConfigureSpatialSource(tornadoAudioBoost);
+        }
+
+        private void ConfigureSpatialSource(AudioSource source)
+        {
+            source.clip = settings.tornadoSound;
+            source.loop = true;
+            source.playOnAwake = false;
+            // Tornado attenuation is intentionally boat-relative. Using Unity's global
+            // AudioListener here would measure from the elevated follow camera instead.
+            source.spatialBlend = 0f;
+            source.dopplerLevel = 0f;
+        }
+
+        private void RefreshTornadoAudioVolume()
+        {
+            float attenuation = 0f;
+            if (boat != null)
+            {
+                Vector3 offset = boat.transform.position - transform.position;
+                float horizontalDistance = new Vector2(offset.x, offset.z).magnitude;
+                float minimumDistance = Mathf.Max(0f, settings.tornadoSoundMinimumDistance);
+                float maximumDistance = Mathf.Max(minimumDistance + .01f,
+                    settings.tornadoSoundMaximumDistance);
+                attenuation = horizontalDistance <= minimumDistance ? 1f
+                    : horizontalDistance >= maximumDistance ? 0f
+                    : 1f - Mathf.SmoothStep(0f, 1f,
+                        Mathf.InverseLerp(minimumDistance, maximumDistance, horizontalDistance));
+            }
+            float configuredVolume = settings.tornadoSoundVolume * attenuation
+                * (GameAudio.Instance != null ? GameAudio.Instance.EffectsVolume : 1f);
+            if (tornadoAudio != null) tornadoAudio.volume = Mathf.Clamp01(configuredVolume);
+            if (tornadoAudioBoost != null) tornadoAudioBoost.volume = Mathf.Clamp01(configuredVolume - 1f);
+        }
+
+        public bool TryTargetDivePoint(SpawnedDivePoint3D point)
+        {
+            if (!IsVisible || targetedDivePoint != null || point == null || !point.IsAvailableForTornado)
+                return false;
+            targetedDivePoint = point;
+            Vector3 delta = point.transform.position - transform.position;
+            delta.y = 0f;
+            targetedDivePointSpeed = Mathf.Max(settings.tornadoSpeed,
+                delta.magnitude / Mathf.Max(.1f, settings.tornadoBuoyTargetMaximumTravelTime));
+            return true;
         }
 
         private IEnumerator Patrol(bool showImmediately)
@@ -222,7 +392,8 @@ namespace GameJamOcean.World
                 for (int point = 1; point < points.Length; point++)
                     yield return MoveZigzag(transform.position, points[point]);
 
-                while (capturing) yield return null;
+                if (targetedDivePoint != null) yield return MoveTowardTargetedDivePoint();
+                while (capturing || activeBuoyCaptures > 0) yield return null;
 
                 if (manager.TryBeginTornadoHide())
                 {
@@ -247,14 +418,43 @@ namespace GameJamOcean.World
             float progress = 0f;
             while (progress < 1f)
             {
+                if (targetedDivePoint != null)
+                {
+                    yield return MoveTowardTargetedDivePoint();
+                    yield break;
+                }
                 progress = Mathf.Min(1f, progress + settings.tornadoSpeed * Time.deltaTime / distance);
                 float envelope = Mathf.Sin(progress * Mathf.PI);
                 float wave = Mathf.Sin(progress * Mathf.PI * 2f * settings.tornadoZigzagCycles);
-                transform.position = Vector3.Lerp(start, destination, progress)
+                Vector3 candidate = Vector3.Lerp(start, destination, progress)
                     + perpendicular * (wave * envelope * settings.tornadoZigzagAmplitude);
+                transform.position = manager.ConstrainTornadoPosition(candidate);
                 yield return null;
             }
             transform.position = destination;
+        }
+
+        private IEnumerator MoveTowardTargetedDivePoint()
+        {
+            float weaveTime = 0f;
+            while (targetedDivePoint != null && targetedDivePoint.IsAvailableForTornado)
+            {
+                Vector3 target = targetedDivePoint.transform.position;
+                target.y = transform.position.y;
+                Vector3 direction = target - transform.position;
+                direction.y = 0f;
+                if (direction.sqrMagnitude <= settings.tornadoBuoyCaptureRadius
+                    * settings.tornadoBuoyCaptureRadius) break;
+                weaveTime += Time.deltaTime;
+                Vector3 stepDirection = direction.normalized;
+                Vector3 sideways = Vector3.Cross(Vector3.up, stepDirection)
+                    * (Mathf.Sin(weaveTime * 2f) * .2f);
+                Vector3 candidate = transform.position
+                    + (stepDirection + sideways).normalized * targetedDivePointSpeed * Time.deltaTime;
+                transform.position = manager.ConstrainTornadoPosition(candidate);
+                yield return null;
+            }
+            targetedDivePoint = null;
         }
 
         private void ShowVisual()
@@ -262,19 +462,11 @@ namespace GameJamOcean.World
             visual = Instantiate(settings.tornadoPrefab, transform);
             visual.transform.localPosition = Vector3.zero;
             visual.transform.localScale *= settings.tornadoVisualScale;
-            if (settings.tornadoSound != null)
+            if (tornadoAudio != null && tornadoAudio.clip != null)
             {
-                tornadoAudio = visual.AddComponent<AudioSource>();
-                tornadoAudio.clip = settings.tornadoSound;
-                tornadoAudio.loop = true;
-                tornadoAudio.playOnAwake = false;
-                tornadoAudio.spatialBlend = 1f;
-                tornadoAudio.rolloffMode = AudioRolloffMode.Logarithmic;
-                tornadoAudio.minDistance = settings.tornadoSoundMinimumDistance;
-                tornadoAudio.maxDistance = Mathf.Max(tornadoAudio.minDistance, settings.tornadoSoundMaximumDistance);
-                tornadoAudio.volume = settings.tornadoSoundVolume
-                    * (GameAudio.Instance != null ? GameAudio.Instance.EffectsVolume : 1f);
+                RefreshTornadoAudioVolume();
                 tornadoAudio.Play();
+                if (tornadoAudioBoost != null && tornadoAudioBoost.volume > 0f) tornadoAudioBoost.Play();
             }
             contact.enabled = true;
             manager.TornadoShown();
@@ -284,6 +476,7 @@ namespace GameJamOcean.World
         {
             contact.enabled = false;
             if (tornadoAudio != null) tornadoAudio.Stop();
+            if (tornadoAudioBoost != null) tornadoAudioBoost.Stop();
             if (visual == null) yield break;
             foreach (ParticleSystem particles in visual.GetComponentsInChildren<ParticleSystem>(true))
                 particles.Stop(true, ParticleSystemStopBehavior.StopEmitting);
@@ -294,12 +487,18 @@ namespace GameJamOcean.World
 
         private void FixedUpdate()
         {
-            if (tornadoAudio != null)
-                tornadoAudio.volume = settings.tornadoSoundVolume
-                    * (GameAudio.Instance != null ? GameAudio.Instance.EffectsVolume : 1f);
+            RefreshTornadoAudioVolume();
+            if (tornadoAudio != null && tornadoAudio.isPlaying && tornadoAudioBoost != null
+                && tornadoAudioBoost.volume > 0f && !tornadoAudioBoost.isPlaying)
+            {
+                tornadoAudioBoost.timeSamples = tornadoAudio.timeSamples;
+                tornadoAudioBoost.Play();
+            }
             if (capturing && (boatHealth == null || boatHealth.IsDead)) CancelCapture();
-            if (!contact.enabled || boat == null || boatBody == null || boatBody.isKinematic ||
-                boatHealth == null || boatHealth.IsDead || GameJamOcean.UI.GameMenus.BlocksGameplay) return;
+            if (!contact.enabled || GameJamOcean.UI.GameMenus.BlocksGameplay) return;
+            TryCaptureNearbyDivePoints();
+            if (boat == null || boatBody == null || boatBody.isKinematic
+                || boatHealth == null || boatHealth.IsDead) return;
             Vector3 toCenter = transform.position - boat.transform.position;
             toCenter.y = 0f;
             float distance = toCenter.magnitude;
@@ -317,6 +516,68 @@ namespace GameJamOcean.World
                 BeginSpiral(toCenter, distance);
             }
             UpdateSpiral();
+        }
+
+        private void TryCaptureNearbyDivePoints()
+        {
+            float radiusSquared = settings.tornadoBuoyCaptureRadius * settings.tornadoBuoyCaptureRadius;
+            var activePoints = SpawnedDivePoint3D.ActivePoints;
+            for (int index = activePoints.Count - 1; index >= 0; index--)
+            {
+                SpawnedDivePoint3D point = activePoints[index];
+                if (point == null) continue;
+                Vector3 delta = point.transform.position - transform.position;
+                delta.y = 0f;
+                if (delta.sqrMagnitude <= radiusSquared && point.TryBeginTornadoCapture())
+                    StartCoroutine(CaptureAndThrowDivePoint(point));
+            }
+        }
+
+        private IEnumerator CaptureAndThrowDivePoint(SpawnedDivePoint3D point)
+        {
+            activeBuoyCaptures++;
+            Transform buoy = point.transform;
+            Vector3 offset = buoy.position - transform.position;
+            float startRadius = Mathf.Max(new Vector2(offset.x, offset.z).magnitude, .25f);
+            float startAngle = Mathf.Atan2(offset.z, offset.x);
+            float directionSign = Random.value < .5f ? -1f : 1f;
+            float startY = buoy.position.y;
+            Quaternion startRotation = buoy.rotation;
+            float duration = Mathf.Max(.1f, settings.tornadoBuoySpiralDuration);
+            float elapsed = 0f;
+            while (elapsed < duration && point != null)
+            {
+                elapsed += Time.fixedDeltaTime;
+                float progress = Mathf.Clamp01(elapsed / duration);
+                float angle = startAngle + directionSign * Mathf.PI * 2f * progress;
+                float radius = Mathf.Lerp(startRadius, .3f, Mathf.SmoothStep(0f, 1f, progress));
+                Vector3 center = transform.position;
+                buoy.position = center + new Vector3(Mathf.Cos(angle) * radius,
+                    Mathf.Lerp(startY - center.y, .35f, progress), Mathf.Sin(angle) * radius);
+                buoy.rotation = Quaternion.AngleAxis(directionSign * 360f * progress, Vector3.up) * startRotation;
+                yield return new WaitForFixedUpdate();
+            }
+
+            if (point != null)
+            {
+                Vector2 randomDirection = Random.insideUnitCircle.normalized;
+                if (randomDirection.sqrMagnitude < .01f) randomDirection = Vector2.right;
+                Vector3 velocity = new(randomDirection.x * settings.tornadoBuoyLaunchSpeed,
+                    settings.tornadoBuoyLaunchUpSpeed, randomDirection.y * settings.tornadoBuoyLaunchSpeed);
+                elapsed = 0f;
+                float flightTime = Mathf.Max(.1f, settings.tornadoBuoyDestructionDelay);
+                while (elapsed < flightTime && point != null)
+                {
+                    float dt = Time.fixedDeltaTime;
+                    elapsed += dt;
+                    buoy.position += velocity * dt;
+                    velocity += Physics.gravity * dt;
+                    buoy.Rotate(Vector3.up, directionSign * 360f * dt, Space.World);
+                    yield return new WaitForFixedUpdate();
+                }
+                if (point != null) point.NotifyDestroyedByTornado();
+            }
+            activeBuoyCaptures = Mathf.Max(0, activeBuoyCaptures - 1);
         }
 
         private void BeginSpiral(Vector3 toCenter, float distance)

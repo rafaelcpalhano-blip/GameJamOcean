@@ -248,23 +248,72 @@ MonoBehaviour:
   - minimumPurchasedUpgrades: 0
     initialEnemies: 6
     totalEnemies: 18
-    enemyWeights: [40, 30, 20, 5, 5]
+    enemyWeights:
+    - 40
+    - 30
+    - 20
+    - 5
+    - 5
   - minimumPurchasedUpgrades: 3
     initialEnemies: 12
     totalEnemies: 30
-    enemyWeights: [20, 30, 30, 10, 10]
+    enemyWeights:
+    - 20
+    - 30
+    - 30
+    - 10
+    - 10
   - minimumPurchasedUpgrades: 6
     initialEnemies: 14
     totalEnemies: 33
-    enemyWeights: [10, 35, 25, 15, 15]
+    enemyWeights:
+    - 10
+    - 35
+    - 25
+    - 15
+    - 15
   - minimumPurchasedUpgrades: 9
     initialEnemies: 15
     totalEnemies: 37
-    enemyWeights: [10, 25, 25, 25, 25]
+    enemyWeights:
+    - 10
+    - 25
+    - 25
+    - 25
+    - 25
   - minimumPurchasedUpgrades: 12
     initialEnemies: 16
     totalEnemies: 42
-    enemyWeights: [15, 15, 10, 30, 30]
+    enemyWeights:
+    - 15
+    - 15
+    - 10
+    - 30
+    - 30
+  finalRewardTiers:
+  - minimumGold: 100
+    maximumGold: 250
+    excellentTimeSeconds: 75
+    excellentKillsPerSecond: 0.36
+  - minimumGold: 125
+    maximumGold: 300
+    excellentTimeSeconds: 82
+    excellentKillsPerSecond: 0.37
+  - minimumGold: 175
+    maximumGold: 350
+    excellentTimeSeconds: 90
+    excellentKillsPerSecond: 0.37
+  - minimumGold: 225
+    maximumGold: 425
+    excellentTimeSeconds: 98
+    excellentKillsPerSecond: 0.38
+  - minimumGold: 300
+    maximumGold: 500
+    excellentTimeSeconds: 108
+    excellentKillsPerSecond: 0.39
+  timeScoreWeight: 0.4
+  damageScoreWeight: 0.3
+  killRateScoreWeight: 0.3
   chestMilestones:
   - 25
   - 50
@@ -343,6 +392,7 @@ MonoBehaviour:
   oceanSceneName: OceanScene_3D
   victoryReturnDelay: 4
   defeatReturnDelay: 1
+  coinIcon: {fileID: 0}
   transitioning: 0
   completedSuccessfully: 0
   committedGold: 0
@@ -1189,6 +1239,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameJamOcean.Weapons.AimCursor2D
   size: 8
+  armLength: 11
+  gap: 5
+  thickness: 2
   color: {r: 1, g: 1, b: 1, a: 1}
   hideSystemCursor: 1
 --- !u!1 &548473070
@@ -1370,6 +1423,7 @@ MonoBehaviour:
   blockingLayers:
     serializedVersion: 2
     m_Bits: 0
+  uncollectedFadeDuration: 0.75
   totalSpawned: 0
   currentlyAlive: 0
   totalCollected: 0
@@ -1967,24 +2021,24 @@ MonoBehaviour:
   player: {fileID: 1745452234}
   spawnedEnemiesParent: {fileID: 1613636309}
   enemies:
-  - prefab: {fileID: 2213202573781266297, guid: 9c5d683240f465847b6552aa4baa0a5a, type: 3}
-    species: 2
+  - species: 2
+    prefab: {fileID: 2213202573781266297, guid: 9c5d683240f465847b6552aa4baa0a5a, type: 3}
     weight: 1
     minimumDifficultyLevel: 0
-  - prefab: {fileID: 6740553679286364748, guid: dfa48fca84db97c4bb44e1a5d14c31fc, type: 3}
-    species: 1
+  - species: 1
+    prefab: {fileID: 6740553679286364748, guid: dfa48fca84db97c4bb44e1a5d14c31fc, type: 3}
     weight: 1
     minimumDifficultyLevel: 0
-  - prefab: {fileID: 419182537058929491, guid: f39ad98778f515a46b0303e45a9818ab, type: 3}
-    species: 3
+  - species: 3
+    prefab: {fileID: 419182537058929491, guid: f39ad98778f515a46b0303e45a9818ab, type: 3}
     weight: 1
     minimumDifficultyLevel: 0
-  - prefab: {fileID: 3829731525909844868, guid: f5ec67ec0150d11468e37ac9002b53f3, type: 3}
-    species: 5
+  - species: 5
+    prefab: {fileID: 3829731525909844868, guid: f5ec67ec0150d11468e37ac9002b53f3, type: 3}
     weight: 1
     minimumDifficultyLevel: 0
-  - prefab: {fileID: 5437784845823516924, guid: e884554ace34ccc418db4f63483e99b2, type: 3}
-    species: 4
+  - species: 4
+    prefab: {fileID: 5437784845823516924, guid: e884554ace34ccc418db4f63483e99b2, type: 3}
     weight: 1
     minimumDifficultyLevel: 0
   spawnPoints:
@@ -2006,6 +2060,10 @@ MonoBehaviour:
   baseSpawnInterval: 2
   intervalReductionPerDifficulty: 0.1
   minimumSpawnInterval: 0.4
+  killWindowSeconds: 5
+  fastKillThreshold: 3
+  fastSpawnInterval: 0.75
+  spawnPointScatterRadius: 3
   baseMaximumAlive: 3
   additionalAlivePerDifficulty: 1
   currentDifficulty: 0
@@ -3053,10 +3111,11 @@ MonoBehaviour:
   maximumSpeed: 4.5
   acceleration: 10
   deceleration: 14
+  powerUpDetectionRadius: 0.75
   hitImmunitySeconds: 1.5
   hitBlinks: 3
   damageSound: {fileID: 8300000, guid: e1cbe4dbceca15149ab6269607a9c7f6, type: 3}
-  damageSoundVolume: 1
+  damageSoundVolume: 0.5
   dashCooldown: 5
   dashSteeringAngle: 30
   dashSteeringSpeed: 240
@@ -3154,10 +3213,12 @@ MonoBehaviour:
   launchPoint: {fileID: 2015856136}
   harpoonPrefab: {fileID: 6356064606066188246, guid: ed9aa031b8c4a8b459c917475d0dba8b, type: 3}
   fireCooldown: 0.4
+  additionalShotDelay: 0.25
   fallbackSpawnDistance: 0.35
   blockedPointerLayers:
     serializedVersion: 2
     m_Bits: 512
+  baseProjectileCount: 1
 --- !u!114 &1745452239
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3173,6 +3234,7 @@ MonoBehaviour:
   maximumHealth: 5
   currentHealth: 0
   restoreOnEnable: 1
+  damageImmunityDuration: 0
   onDamaged:
     m_PersistentCalls:
       m_Calls: []

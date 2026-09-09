@@ -34,6 +34,8 @@ namespace GameJamOcean.Audio
         [Range(0f, 2f)] public float coinCollectedVolume = 1f;
         public AudioClip coinCounting;
         [Range(0f, 2f)] public float coinCountingVolume = 1f;
+        [Range(0f, 4f)] public float coinCountingGainMultiplier = 2f;
+        [Min(.1f)] public float coinCountingTargetDuration = 2f;
         [Header("DiveScene Effects")]
         public AudioClip powerUpCollected;
         [Range(0f, 2f)] public float powerUpCollectedVolume = 1f;
@@ -83,9 +85,10 @@ namespace GameJamOcean.Audio
         [Header("Ocean VFX — Tornado obstacle")]
         public GameObject tornadoPrefab;
         public AudioClip tornadoSound;
-        [Range(0f, 1f)] public float tornadoSoundVolume = .7f;
-        [Min(.1f)] public float tornadoSoundMinimumDistance = 3f;
-        [Min(.1f)] public float tornadoSoundMaximumDistance = 18f;
+        [Range(0f, 2f)] public float tornadoSoundVolume = 1.1f;
+        [Min(.1f)] public float tornadoSoundMinimumDistance = 12f;
+        [Min(.1f)] public float tornadoSoundMaximumDistance = 45f;
+        [Min(0f)] public float tornadoIslandClearance = 4f;
         [Min(1)] public int tornadoCount = 6;
         [Min(1)] public int tornadoMinimumActive = 3;
         [Min(.1f)] public float tornadoSpeed = 2f;
@@ -100,6 +103,15 @@ namespace GameJamOcean.Audio
         [Min(.1f)] public float tornadoSpiralDuration = 1.75f;
         [Min(0f)] public float tornadoLaunchSpeed = 9f;
         [Min(0f)] public float tornadoLaunchControlLockSeconds = .6f;
+        [Header("Ocean VFX — Tornado and dive buoy")]
+        [Min(.1f)] public float tornadoBuoyCaptureRadius = 2.5f;
+        [Min(.1f)] public float tornadoBuoySpiralDuration = 1.5f;
+        [Min(0f)] public float tornadoBuoyLaunchSpeed = 8f;
+        [Min(0f)] public float tornadoBuoyLaunchUpSpeed = 7f;
+        [Min(.1f)] public float tornadoBuoyDestructionDelay = 2.5f;
+        [Min(.1f)] public float tornadoBuoyTargetMinimumInterval = 12f;
+        [Min(.1f)] public float tornadoBuoyTargetMaximumInterval = 20f;
+        [Min(.1f)] public float tornadoBuoyTargetMaximumTravelTime = 8f;
         [Min(0f)] public float tornadoBoat1Damage = 20f;
         [Min(0f)] public float tornadoBoat2Damage = 15f;
         [Min(0f)] public float tornadoBoat3Damage = 10f;
@@ -110,5 +122,11 @@ namespace GameJamOcean.Audio
         [Min(0f)] public float tornadoInitialDelayMaximum = 20f;
         [Min(.05f)] public float tornadoDisappearanceFadeSeconds = .6f;
         public TornadoRoute3D[] tornadoRoutes;
+
+        [Header("Ocean enemies — Shark")]
+        public AudioClip sharkDrama;
+        [Range(0f, 2f)] public float sharkDramaVolume = .7f;
+        [Min(0f)] public float sharkDramaFadeOutSeconds = .5f;
+        [Min(.05f)] public float sharkDramaEscapeFadeOutSeconds = .2f;
     }
 }

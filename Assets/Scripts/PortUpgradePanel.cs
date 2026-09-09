@@ -329,6 +329,10 @@ namespace GameJamOcean.Progression
                 labels[i] = Label("Description", row, new Vector2(630, 35), new Vector2(-100, -35), "", 16);
                 labels[i].alignment = TextAlignmentOptions.MidlineLeft;
                 buttons[i] = ButtonUI("Buy", row, new Vector2(180, 64), new Vector2(335, -6), out prices[i]);
+                prices[i].fontSize = 16.5f;
+                prices[i].fontSizeMin = 11f;
+                prices[i].fontSizeMax = 16.5f;
+                prices[i].lineSpacing = -10f;
                 int index = i;
                 buttons[i].onClick.AddListener(() => Buy(index));
             }

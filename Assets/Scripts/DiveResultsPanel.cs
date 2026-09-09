@@ -30,8 +30,8 @@ namespace GameJamOcean.Flow
             GameJamOcean.UI.GameFontStyles.Apply(title, GameJamOcean.UI.GameFontRole.Display);
             Text(content, "Progress", new Vector2(560, 35), new Vector2(0, -80),
                 $"Inimigos derrotados: {session.KilledEnemies}/{session.TotalEnemies}", 21, Color.white);
-            Row(content, session.SmallChestIcon, $"Baú P ×{session.OpenedSmallChests}", session.SecuredGold, -140);
-            Row(content, session.FinalChestIcon, won ? "Baú G ×1" : "Baú G ×0", session.FinalRewardGold, -210);
+            Row(content, session.SmallChestIcon, $"Baú Pequeno ×{session.OpenedSmallChests}", session.SecuredGold, -140);
+            Row(content, session.FinalChestIcon, won ? "Baú Grande ×1" : "Baú Grande ×0", session.FinalRewardGold, -210);
             Row(content, coin, "Moedas soltas", session.CollectedCoinGold, -280);
             TMP_Text totalLabel = Text(content, "Total", new Vector2(560, 45), new Vector2(0, -365),
                 "TOTAL RECEBIDO: 0 OURO", 28, new Color(1, 0.85f, 0.1f));

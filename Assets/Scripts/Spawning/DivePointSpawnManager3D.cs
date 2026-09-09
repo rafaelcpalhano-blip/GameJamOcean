@@ -186,6 +186,30 @@ namespace GameJamOcean.Spawning
             activePointCount = instancesByPoint.Count;
         }
 
+        public void ReplaceDivePointDestroyedByTornado(int pointIndex, GameObject destroyedInstance)
+        {
+            if (pointIndex < 0 || !instancesByPoint.TryGetValue(pointIndex, out GameObject current)
+                || current != destroyedInstance) return;
+            StartCoroutine(ReplaceTornadoDestroyedPoint(pointIndex, destroyedInstance));
+        }
+
+        private IEnumerator ReplaceTornadoDestroyedPoint(int pointIndex, GameObject destroyedInstance)
+        {
+            if (destroyedInstance != null) Destroy(destroyedInstance);
+            instancesByPoint.Remove(pointIndex);
+            PersistentActiveIndices.Remove(pointIndex);
+            lastReplacedPoint = pointIndex;
+            activePointCount = instancesByPoint.Count;
+            if (replacementDelay > 0f) yield return new WaitForSeconds(replacementDelay);
+            int replacementIndex = GetRandomUnusedIndex(pointIndex);
+            if (replacementIndex >= 0)
+            {
+                PersistentActiveIndices.Add(replacementIndex);
+                SpawnAt(replacementIndex);
+            }
+            activePointCount = instancesByPoint.Count;
+        }
+
         private int GetRandomUnusedIndex(int excludedIndex = -1)
         {
             List<int> availableIndices = new();

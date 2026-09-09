@@ -7,7 +7,7 @@ namespace GameJamOcean.Audio
     {
         private OceanAudioSettings settings;
         private AudioSource ambience, sceneMusic, effects, uiEffects, uiClickEffects, randomAmbience,
-            engine, boatTurbo, divePauseAmbience, coinCounting;
+            engine, boatTurbo, divePauseAmbience, coinCounting, coinCountingBoost;
         public static GameAudio Instance { get; private set; }
         private Coroutine randomSounds;
         private Coroutine letterSounds;
@@ -40,6 +40,7 @@ namespace GameJamOcean.Audio
             boatTurbo = gameObject.AddComponent<AudioSource>();
             divePauseAmbience = gameObject.AddComponent<AudioSource>();
             coinCounting = gameObject.AddComponent<AudioSource>();
+            coinCountingBoost = gameObject.AddComponent<AudioSource>();
             uiEffects.playOnAwake = uiClickEffects.playOnAwake = randomAmbience.playOnAwake = false;
             uiEffects.spatialBlend = uiClickEffects.spatialBlend = randomAmbience.spatialBlend = 0f;
             ambience.playOnAwake = effects.playOnAwake = false;
@@ -57,9 +58,12 @@ namespace GameJamOcean.Audio
             divePauseAmbience.playOnAwake = false;
             divePauseAmbience.spatialBlend = 0f;
             divePauseAmbience.ignoreListenerPause = true;
-            coinCounting.loop = true;
+            coinCounting.loop = false;
             coinCounting.playOnAwake = false;
             coinCounting.spatialBlend = 0f;
+            coinCountingBoost.loop = false;
+            coinCountingBoost.playOnAwake = false;
+            coinCountingBoost.spatialBlend = 0f;
             ambience.spatialBlend = effects.spatialBlend = 0f;
             uiEffects.ignoreListenerPause = true; // Only letters bypass pause, never combat audio.
             uiClickEffects.ignoreListenerPause = true;
@@ -98,8 +102,7 @@ namespace GameJamOcean.Audio
             effects.volume = EffectsVolume;
             uiEffects.volume = EffectsVolume;
             uiClickEffects.volume = EffectsVolume;
-            if (coinCounting != null && settings != null)
-                coinCounting.volume = EffectsVolume * settings.coinCountingVolume;
+            RefreshCoinCountingVolume();
             RefreshEngineVolume();
             RefreshBoatTurboVolume();
             if (divePauseAmbience != null && divePauseAmbience.isPlaying && settings != null)
@@ -113,6 +116,7 @@ namespace GameJamOcean.Audio
             randomAmbience.Stop();
             effects.Stop();
             coinCounting.Stop();
+            coinCountingBoost.Stop();
             StopBoatTurboImmediately();
             SetDivePauseAmbience(false);
             if (scene != "OceanScene_3D") StopBoatEngine();
@@ -191,12 +195,29 @@ namespace GameJamOcean.Audio
             if (settings == null || coinCounting == null || settings.coinCounting == null) return;
             coinCounting.Stop();
             coinCounting.clip = settings.coinCounting;
-            coinCounting.volume = EffectsVolume * settings.coinCountingVolume;
+            coinCountingBoost.clip = settings.coinCounting;
+            coinCounting.loop = false;
+            coinCountingBoost.loop = false;
+            float pitch = Mathf.Clamp(settings.coinCounting.length
+                / Mathf.Max(.1f, settings.coinCountingTargetDuration), .1f, 3f);
+            coinCounting.pitch = pitch;
+            coinCountingBoost.pitch = pitch;
+            RefreshCoinCountingVolume();
             coinCounting.Play();
+            if (coinCountingBoost.volume > 0f) coinCountingBoost.Play();
         }
         public void StopCoinCounting()
         {
             if (coinCounting != null) coinCounting.Stop();
+            if (coinCountingBoost != null) coinCountingBoost.Stop();
+        }
+        private void RefreshCoinCountingVolume()
+        {
+            if (settings == null) return;
+            float configuredVolume = EffectsVolume * settings.coinCountingVolume
+                * settings.coinCountingGainMultiplier;
+            if (coinCounting != null) coinCounting.volume = Mathf.Clamp01(configuredVolume);
+            if (coinCountingBoost != null) coinCountingBoost.volume = Mathf.Clamp01(configuredVolume - 1f);
         }
         public void PlayPowerUpCollected() => PlayEffect(settings?.powerUpCollected,
             settings != null ? settings.powerUpCollectedVolume : 1f);
@@ -279,8 +300,8 @@ namespace GameJamOcean.Audio
             settings != null ? settings.boatUpgradeVolume : 1f);
         public void PlayDiverWaterJump() => PlayEffect(settings?.diverWaterJump,
             settings != null ? settings.diverWaterJumpVolume : 1f);
-        public void PlayBoatCollision() => PlayEffect(settings?.boatCollision,
-            settings != null ? settings.boatCollisionVolume : 1f);
+        public void PlayBoatCollision(float volumeMultiplier = 1f) => PlayEffect(settings?.boatCollision,
+            (settings != null ? settings.boatCollisionVolume : 1f) * Mathf.Max(0f, volumeMultiplier));
 
         public void PlayBoatEngine(int boatLevel)
         {

@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using GameJamOcean.Audio;
 using GameJamOcean.Boat;
 using GameJamOcean.Combat;
 
@@ -50,6 +51,10 @@ namespace GameJamOcean.World
         private GameJamOcean.Spawning.DiveSpawnExclusionCircle3D[] exclusions;
         private float forcedSlideUntil;
         private Vector3 forcedSlideDirection;
+        private OceanAudioSettings audioSettings;
+        private AudioSource dramaSource;
+        private Coroutine dramaRoutine;
+        private bool dramaMutedForCurrentCharge;
 
         public static void ConfigureScene(Scene scene)
         {
@@ -64,6 +69,15 @@ namespace GameJamOcean.World
         private void Start()
         {
             home = transform.position;
+            audioSettings = Resources.Load<OceanAudioSettings>("OceanAudioSettings");
+            if (audioSettings != null && audioSettings.sharkDrama != null)
+            {
+                dramaSource = gameObject.AddComponent<AudioSource>();
+                dramaSource.playOnAwake = false;
+                dramaSource.loop = false;
+                dramaSource.spatialBlend = 0f;
+                dramaSource.clip = audioSettings.sharkDrama;
+            }
             ApplyFinColor();
             fullDiveDepth = diveDepth;
             foreach (var visual in GetComponentsInChildren<Renderer>())
@@ -182,6 +196,8 @@ namespace GameJamOcean.World
                 && Allowed(boat.transform.position, true))
             {
                 charging = true; chargeLaunched = false;
+                dramaMutedForCurrentCharge = false;
+                PlaySharkDrama();
                 aimUntil = Time.time + aimDuration;
                 // Allow a smooth half-turn and surfacing before starting the actual chase timer.
                 chargeUntil = aimUntil + 360f / Mathf.Max(1f, chargeTurnSpeed)
@@ -197,6 +213,9 @@ namespace GameJamOcean.World
                 nextAttack = Time.time + attackCooldown;
                 ChoosePoint();
             }
+            if (charging && !dramaMutedForCurrentCharge
+                && Flat(boat.transform.position - position).sqrMagnitude > detectionRange * detectionRange)
+                FadeOutSharkDramaAfterEscape();
             if (charging) { destination = boat.transform.position; destination.y = home.y; }
             if (!charging && Flat(destination - position).sqrMagnitude < .5f) ChoosePoint();
             Vector3 desired = Flat(destination - position).normalized;
@@ -243,6 +262,66 @@ namespace GameJamOcean.World
             sharkBody.MoveRotation(Quaternion.LookRotation(direction, Vector3.up) * initialRotation);
         }
 
+        private void PlaySharkDrama()
+        {
+            if (dramaSource == null || audioSettings == null || audioSettings.sharkDrama == null) return;
+            if (dramaRoutine != null) StopCoroutine(dramaRoutine);
+            dramaRoutine = StartCoroutine(PlaySharkDramaOnce());
+        }
+
+        private IEnumerator PlaySharkDramaOnce()
+        {
+            dramaSource.Stop();
+            dramaSource.clip = audioSettings.sharkDrama;
+            dramaSource.volume = audioSettings.sharkDramaVolume
+                * (GameAudio.Instance != null ? GameAudio.Instance.EffectsVolume : 1f);
+            dramaSource.Play();
+            float fadeDuration = Mathf.Min(audioSettings.sharkDramaFadeOutSeconds, dramaSource.clip.length);
+            float fullVolumeDuration = Mathf.Max(0f, dramaSource.clip.length - fadeDuration);
+            float elapsed = 0f;
+            while (elapsed < fullVolumeDuration && dramaSource.isPlaying)
+            {
+                elapsed += Time.deltaTime;
+                dramaSource.volume = audioSettings.sharkDramaVolume
+                    * (GameAudio.Instance != null ? GameAudio.Instance.EffectsVolume : 1f);
+                yield return null;
+            }
+            elapsed = 0f;
+            while (elapsed < fadeDuration && dramaSource.isPlaying)
+            {
+                elapsed += Time.deltaTime;
+                float baseVolume = audioSettings.sharkDramaVolume
+                    * (GameAudio.Instance != null ? GameAudio.Instance.EffectsVolume : 1f);
+                dramaSource.volume = baseVolume * (1f - Mathf.Clamp01(elapsed / Mathf.Max(.01f, fadeDuration)));
+                yield return null;
+            }
+            dramaSource.Stop();
+            dramaRoutine = null;
+        }
+
+        private void FadeOutSharkDramaAfterEscape()
+        {
+            dramaMutedForCurrentCharge = true;
+            if (dramaSource == null || !dramaSource.isPlaying) return;
+            if (dramaRoutine != null) StopCoroutine(dramaRoutine);
+            dramaRoutine = StartCoroutine(FadeOutEscapedSharkDrama());
+        }
+
+        private IEnumerator FadeOutEscapedSharkDrama()
+        {
+            float duration = audioSettings != null ? audioSettings.sharkDramaEscapeFadeOutSeconds : .2f;
+            float initialVolume = dramaSource.volume;
+            float elapsed = 0f;
+            while (elapsed < duration && dramaSource.isPlaying)
+            {
+                elapsed += Time.deltaTime;
+                dramaSource.volume = initialVolume * (1f - Mathf.Clamp01(elapsed / Mathf.Max(.01f, duration)));
+                yield return null;
+            }
+            dramaSource.Stop();
+            dramaRoutine = null;
+        }
+
         private void OnCollisionEnter(Collision collision) => HandleContact(collision);
         private void OnCollisionStay(Collision collision) => HandleContact(collision);
         private void HandleContact(Collision collision)
@@ -265,6 +344,7 @@ namespace GameJamOcean.World
             BoatVisualUpgrade3D visual = boat.GetComponent<BoatVisualUpgrade3D>();
             float appliedDamagePercent = visual != null ? visual.SharkDamagePercent : damagePercent;
             health.TakeDamage(health.MaximumHealth * appliedDamagePercent / 100f, gameObject);
+            GameAudio.Instance?.PlayBoatCollision(.5f);
             var body = boat.GetComponent<Rigidbody>();
             Vector3 push = body != null ? Flat(body.position - sharkBody.position).normalized : direction;
             if (push.sqrMagnitude < .001f) push = direction;

@@ -17,9 +17,9 @@ MonoBehaviour:
   - {fileID: 6160021786610345085, guid: 568186e5b4e28934792cd8465b274ba5, type: 3}
   shieldSprite: {fileID: 4556617768182904718, guid: 9336c539d8c6a6245b95e32de161d280, type: 3}
   speedSprite: {fileID: 973674837010917727, guid: 293a379e0c6cb79428de82ab26de293b, type: 3}
-  doubleHarpoonDuration: 12
+  doubleHarpoonDuration: 10
   doubleHarpoonAngle: 18
-  shieldDuration: 5
-  speedDuration: 7
+  shieldDuration: 6
+  speedDuration: 8
   speedMultiplier: 1.5
   pickupScale: 0.9

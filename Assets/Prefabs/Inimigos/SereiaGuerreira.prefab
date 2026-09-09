@@ -197,6 +197,7 @@ MonoBehaviour:
   maximumHealth: 7
   currentHealth: 0
   restoreOnEnable: 1
+  damageImmunityDuration: 0
   onDamaged:
     m_PersistentCalls:
       m_Calls: []
@@ -218,15 +219,29 @@ MonoBehaviour:
   target: {fileID: 0}
   movementSpeed: 2
   stoppingDistance: 0.65
+  separationRadius: 1.5
+  separationStrength: 1.3
+  weaveStrength: 0.55
+  steeringSharpness: 3
+  massAttackDistance: 6
+  distantSpeedMultiplier: 1.65
+  finalWaveThreshold: 0.85
+  finalWaveSpeedMultiplier: 1.3
+  isolationDistance: 7.5
+  isolationCheckInterval: 1
+  isolationSpeedBuffCooldown: 5
+  isolationSpeedBuffDuration: 4
+  isolationSpeedMultiplier: 1.65
+  isolationEnemyCount: 5
   attackType: 0
   attackRange: 0.8
   attackDamage: 2
   attackCooldown: 1.25
-  attackSound: {fileID: 8300000, guid: cdab6e20792a6ca4093d14ccf97c35dc, type: 3}
-  attackSoundVolume: 1
   onAttack:
     m_PersistentCalls:
       m_Calls: []
+  attackSound: {fileID: 8300000, guid: cdab6e20792a6ca4093d14ccf97c35dc, type: 3}
+  attackSoundVolume: 0.7
   onEnemyDied:
     m_PersistentCalls:
       m_Calls: []
@@ -244,5 +259,23 @@ MonoBehaviour:
   hurtAnimationDuration: 0.35
   destroyOnDeath: 1
   destroyDelay: 0
+  showDamageNumbers: 1
+  damageNumberLifetime: 0.8
+  damageNumberHeight: 0.25
   spriteRenderer: {fileID: 0}
   spriteFacesRight: 1
+  jellyfishDodgeChance: 0.65
+  jellyfishDodgeDuration: 0.32
+  jellyfishDodgeSpeedMultiplier: 2.3
+  octopusDashCooldown: 2.4
+  octopusDashDuration: 0.65
+  octopusDashSpeedMultiplier: 2.25
+  octopusLungeIntervalMin: 1.8
+  octopusLungeIntervalMax: 3.4
+  octopusLungeDuration: 1
+  octopusLungeSpeedMultiplier: 2.6
+  octopusRetreatDuration: 0.34
+  octopusEscapeDuration: 0.42
+  octopusKnockbackSpeed: 2.6
+  warriorKnockbackSpeed: 4.5
+  knockbackDuration: 0.18
