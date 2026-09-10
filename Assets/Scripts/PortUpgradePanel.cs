@@ -1,6 +1,7 @@
 using GameJamOcean.Boat;
 using GameJamOcean.Combat;
 using GameJamOcean.Interaction;
+using GameJamOcean.Localization;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -24,6 +25,8 @@ namespace GameJamOcean.Progression
         [SerializeField, Min(0)] private int fullRepairCost = 150;
         private Button repairButton;
         private TMP_Text repairPrice;
+        private TMP_Text titleLabel;
+        private TMP_Text closeLabel;
         private bool repairing;
 
         private int RepairCost(Health health)
@@ -41,9 +44,9 @@ namespace GameJamOcean.Progression
             repairing = true;
             try
             {
-                if (cost > 0 && !progress.TrySpendGold(cost)) { statusLabel.text = "Ouro insuficiente para o conserto."; return; }
+                if (cost > 0 && !progress.TrySpendGold(cost)) { SetStatus("upgrade.repair.insufficient"); return; }
                 health.Heal(health.MaximumHealth - health.CurrentHealth);
-                statusLabel.text = $"Barco consertado! Casco 100%. Custo: {cost} ouro.";
+                SetStatus("upgrade.repair.success", cost);
                 ShowUpgradeAcquiredColor();
                 Refresh();
             }
@@ -75,14 +78,13 @@ namespace GameJamOcean.Progression
         private bool firstPierGoldHintShown;
         private Coroutine statusColorRoutine;
         private readonly Button[] boatButtons = new Button[3];
-        private static readonly string[] VillageThanks =
+        private readonly TMP_Text[] boatLabels = new TMP_Text[3];
+        private static readonly string[] VillageThanksKeys =
         {
-            "",
-            "Os moradores agradecem pelo novo píer! Para tornar este lugar seguro diante das grandes embarcações, ainda precisamos evoluir bastante. Nosso objetivo é construir um farol e fazê-lo brilhar. Será um caminho árduo, mas recompensador.",
-            "A vila está crescendo graças à sua ajuda. Os moradores agradecem por mais este avanço!",
-            "Cada melhoria torna nossa comunidade mais forte. Muito obrigado por continuar ao nosso lado!",
-            "O farol voltou a brilhar! Todo o vilarejo agradece por você ter tornado este lugar mais seguro."
+            "", "village.thanks.1", "village.thanks.2", "village.thanks.3", "village.thanks.4"
         };
+        private string currentStatusKey = "upgrade.status.choose";
+        private object[] currentStatusArgs = System.Array.Empty<object>();
 
         public void Configure(GameObject first, GameObject second, GameObject third, GameObject fourth, BoatController3D targetBoat)
         {
@@ -102,6 +104,7 @@ namespace GameJamOcean.Progression
             BuildPanel();
             progress.UpgradesChanged += OnProgressChanged;
             progress.TotalGoldChanged += OnGoldChanged;
+            LocalizationManager.LanguageChanged += HandleLanguageChanged;
             OnProgressChanged();
         }
 
@@ -138,7 +141,7 @@ namespace GameJamOcean.Progression
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
             modal.SetActive(true);
-            statusLabel.text = progress.IsGameCompleted ? "Aldeia N4 — jogo concluído!" : "Escolha um upgrade. Todos os preços são em ouro.";
+            SetStatus(progress.IsGameCompleted ? "upgrade.status.completed" : "upgrade.status.choose");
             statusLabel.color = Color.white;
             Refresh();
             if (!firstPierGoldHintShown && progress.GetLevel(UpgradeKind.Island) == 0)
@@ -171,6 +174,7 @@ namespace GameJamOcean.Progression
                 progress.UpgradesChanged -= OnProgressChanged;
                 progress.TotalGoldChanged -= OnGoldChanged;
             }
+            LocalizationManager.LanguageChanged -= HandleLanguageChanged;
         }
 
         private void OnGoldChanged(int gold) => Refresh();
@@ -189,7 +193,7 @@ namespace GameJamOcean.Progression
                 if (villageLevel3 != null && villageLevel3 != chosen) villageLevel3.SetActive(false);
                 if (villageLevel4 != null && villageLevel4 != chosen) villageLevel4.SetActive(false);
             }
-            if (progress.IsGameCompleted && statusLabel != null) statusLabel.text = "Aldeia N4 — jogo concluído! Obrigado por construir sua aldeia.";
+            if (progress.IsGameCompleted && statusLabel != null) SetStatus("upgrade.status.completed_thanks");
             Refresh();
         }
 
@@ -198,7 +202,7 @@ namespace GameJamOcean.Progression
             if (!isOpen || Time.unscaledTime < nextPurchaseTime) return;
             nextPurchaseTime = Time.unscaledTime + 0.35f;
             if (index == 0 && (villageLevel1 == null || villageLevel2 == null || villageLevel3 == null || villageLevel4 == null))
-            { statusLabel.text = "Configure as quatro versões da aldeia antes de comprar."; return; }
+            { SetStatus("upgrade.error.village_versions"); return; }
             UpgradeKind kind = VisibleUpgrades[index];
             bool completedBefore = progress.IsGameCompleted;
             bool purchased = progress.TryPurchase(kind, offeredLevels[index], out string message);
@@ -208,10 +212,10 @@ namespace GameJamOcean.Progression
                 && boat.TryGetComponent(out BoatStats3D boatStats))
                 boatStats.SelectBoat(progress.GetLevel(UpgradeKind.BoatHull));
             int villageLevel = progress.GetLevel(UpgradeKind.Island);
-            statusLabel.text = purchased && kind == UpgradeKind.Island
-                ? VillageThanks[Mathf.Clamp(villageLevel, 1, 4)]
-                : progress.IsGameCompleted ? "Aldeia N4 — jogo concluído!" : message;
-            if (purchased && message == "Upgrade adquirido!")
+            SetStatus(purchased && kind == UpgradeKind.Island
+                ? VillageThanksKeys[Mathf.Clamp(villageLevel, 1, 4)]
+                : progress.IsGameCompleted ? "upgrade.status.completed" : message);
+            if (purchased && message == "upgrade.purchase.success")
                 ShowUpgradeAcquiredColor();
             else
                 statusLabel.color = Color.white;
@@ -226,13 +230,14 @@ namespace GameJamOcean.Progression
         private void Refresh()
         {
             if (goldLabel == null || progress == null) return;
-            goldLabel.text = $"OURO DISPONÍVEL: {progress.TotalGold}";
+            goldLabel.text = LocalizationManager.Get("upgrade.gold_available", progress.TotalGold);
             if (repairButton != null)
             {
                 var hull = boat != null ? boat.GetComponent<Health>() : null;
                 bool damaged = hull != null && !hull.IsDead && hull.CurrentHealth < hull.MaximumHealth;
                 int cost = damaged ? RepairCost(hull) : 0;
-                repairPrice.text = damaged ? $"CONSERTAR BARCO — {cost} OURO" : "CASCO 100% — SEM REPAROS";
+                repairPrice.text = LocalizationManager.Get(damaged
+                    ? "upgrade.repair.button" : "upgrade.repair.full", cost);
                 repairButton.interactable = damaged && progress.TotalGold >= cost;
                 SetPurchaseButtonVisual(repairButton);
             }
@@ -251,7 +256,7 @@ namespace GameJamOcean.Progression
                 {
                     upgradeNames[i].text = kind.ToString();
                     labels[i].text = "";
-                    prices[i].text = "Indisponível";
+                    prices[i].text = LocalizationManager.Get("upgrade.unavailable");
                     buttons[i].interactable = false;
                     SetPurchaseButtonVisual(buttons[i]);
                     continue;
@@ -259,11 +264,14 @@ namespace GameJamOcean.Progression
                 bool maximum = level >= definition.MaximumLevel;
                 var next = definition.Tier(Mathf.Min(definition.MaximumLevel, level + 1));
                 upgradeNames[i].text = firstPierUpgrade && kind == UpgradeKind.Island
-                    ? "PIER" : UpgradeTitle(kind, level);
+                    ? LocalizationManager.Get("upgrade.pier") : UpgradeTitle(kind, level);
                 labels[i].text = firstPierUpgrade && kind == UpgradeKind.Island
-                    ? "O primeiro passo para melhorar o comércio marítimo; o próximo será nosso farol!"
-                    : maximum ? "Nível máximo" : $"Nível {level + 1}: {Describe(definition.kind, next, level + 1)}";
-                prices[i].text = maximum ? "MÁXIMO" : $"{next.goldCost} OURO\nCOMPRAR";
+                    ? LocalizationManager.Get("upgrade.pier.description")
+                    : maximum ? LocalizationManager.Get("upgrade.maximum_level")
+                    : LocalizationManager.Get("upgrade.next_level", level + 1,
+                        Describe(definition.kind, next, level + 1));
+                prices[i].text = maximum ? LocalizationManager.Get("upgrade.maximum")
+                    : LocalizationManager.Get("upgrade.buy", next.goldCost);
                 buttons[i].interactable = !maximum && progress.TotalGold >= next.goldCost;
                 if (kind == UpgradeKind.Island && (villageLevel1 == null || villageLevel2 == null || villageLevel3 == null || villageLevel4 == null)) buttons[i].interactable = false;
                 SetPurchaseButtonVisual(buttons[i]);
@@ -273,50 +281,69 @@ namespace GameJamOcean.Progression
             if (!valid) statusLabel.text = error;
         }
 
+        private void SetStatus(string key, params object[] args)
+        {
+            currentStatusKey = key;
+            currentStatusArgs = args ?? System.Array.Empty<object>();
+            if (statusLabel != null)
+                statusLabel.text = LocalizationManager.Get(currentStatusKey, currentStatusArgs);
+        }
+
+        private void HandleLanguageChanged()
+        {
+            if (titleLabel != null) titleLabel.text = LocalizationManager.Get("upgrade.title");
+            if (closeLabel != null) closeLabel.text = LocalizationManager.Get("common.close");
+            for (int i = 0; i < boatLabels.Length; i++)
+                if (boatLabels[i] != null)
+                    boatLabels[i].text = LocalizationManager.Get("upgrade.boat_label", i + 1);
+            SetStatus(currentStatusKey, currentStatusArgs);
+            Refresh();
+        }
+
         private static string Describe(UpgradeKind kind, UpgradeTier tier, int level)
         {
             if (kind == UpgradeKind.Island) return level switch
             {
-                2 => "Mais moradores chegando, as condições da ilha estão melhorando.",
-                3 => "A construção do farol será um grande avanço para ilha.",
-                4 => "Acenda a luz do farol, e traga segurança para a nossa pequena ilha.",
-                _ => "Nova aparência da ilha."
+                2 => LocalizationManager.Get("upgrade.island.2"),
+                3 => LocalizationManager.Get("upgrade.island.3"),
+                4 => LocalizationManager.Get("upgrade.island.4"),
+                _ => LocalizationManager.Get("upgrade.island.appearance")
             };
             if (kind == UpgradeKind.BoatHull) return level switch
             {
-                2 => "Casco +15% / Turbo +20% sobre o valor inicial",
-                3 => "Casco +30% / Turbo +40% sobre o valor inicial",
-                _ => "Nível máximo"
+                2 => LocalizationManager.Get("upgrade.boat.2"),
+                3 => LocalizationManager.Get("upgrade.boat.3"),
+                _ => LocalizationManager.Get("upgrade.maximum_level")
             };
-            if (kind == UpgradeKind.DiverHealth) return "+2 pontos de vida.";
+            if (kind == UpgradeKind.DiverHealth) return LocalizationManager.Get("upgrade.diver_health");
             if (kind == UpgradeKind.DiverSpeed) return level switch
             {
-                2 => "15% sobre o valor inicial",
-                3 => "30% sobre o valor inicial",
-                _ => "Nível máximo"
+                2 => LocalizationManager.Get("upgrade.diver_speed.2"),
+                3 => LocalizationManager.Get("upgrade.diver_speed.3"),
+                _ => LocalizationManager.Get("upgrade.maximum_level")
             };
             if (kind == UpgradeKind.Harpoon) return level switch
             {
-                2 => "Velocidade +2 / Distância +6",
-                3 => "Velocidade +4 / Distância +10 / Dano +1",
-                4 => "Projétil duplo",
-                _ => "Nível máximo"
+                2 => LocalizationManager.Get("upgrade.harpoon.2"),
+                3 => LocalizationManager.Get("upgrade.harpoon.3"),
+                4 => LocalizationManager.Get("upgrade.harpoon.4"),
+                _ => LocalizationManager.Get("upgrade.maximum_level")
             };
-            return $"+{tier.value:0.#}% sobre o valor inicial";
+            return LocalizationManager.Get("upgrade.percent_initial", tier.value.ToString("0.#"));
         }
 
         private static string UpgradeTitle(UpgradeKind kind, int level)
         {
             string name = kind switch
             {
-                UpgradeKind.Island => "Ilha",
-                UpgradeKind.BoatHull => "Embarcação",
-                UpgradeKind.DiverHealth => "Mergulhador - Vida",
-                UpgradeKind.DiverSpeed => "Mergulhador - Velocidade",
-                UpgradeKind.Harpoon => "Mergulhador - Arpão",
+                UpgradeKind.Island => LocalizationManager.Get("upgrade.name.island"),
+                UpgradeKind.BoatHull => LocalizationManager.Get("upgrade.name.vessel"),
+                UpgradeKind.DiverHealth => LocalizationManager.Get("upgrade.name.diver_health"),
+                UpgradeKind.DiverSpeed => LocalizationManager.Get("upgrade.name.diver_speed"),
+                UpgradeKind.Harpoon => LocalizationManager.Get("upgrade.name.harpoon"),
                 _ => kind.ToString()
             };
-            return $"{name} | Atual Nível {level}";
+            return LocalizationManager.Get("upgrade.current_level", name, level);
         }
 
         private void BuildPanel()
@@ -340,12 +367,15 @@ namespace GameJamOcean.Progression
                 new Vector2(960, 900), new Color(0.025f, 0.10f, 0.14f, .72f),
                 "Port Upgrades", out RectTransform content);
             panel.sizeDelta = new Vector2(960, 900);
-            TMP_Text title = Label("Title", content, new Vector2(650, 40), new Vector2(0, -30), "UPGRADES DO PORTO", 30);
-            GameJamOcean.UI.GameFontStyles.Apply(title, GameJamOcean.UI.GameFontRole.Display);
-            goldLabel = Label("Gold", content, new Vector2(800, 35), new Vector2(0, -75), "OURO", 24);
+            titleLabel = Label("Title", content, new Vector2(650, 40), new Vector2(0, -30),
+                LocalizationManager.Get("upgrade.title"), 30);
+            GameJamOcean.UI.GameFontStyles.Apply(titleLabel, GameJamOcean.UI.GameFontRole.Display);
+            goldLabel = Label("Gold", content, new Vector2(800, 35), new Vector2(0, -75),
+                LocalizationManager.Get("upgrade.gold"), 24);
             GameJamOcean.UI.GameFontStyles.Apply(goldLabel, GameJamOcean.UI.GameFontRole.Display);
             Button close = ButtonUI("Close", content, new Vector2(90, 40), new Vector2(400, -30), out TMP_Text closeText);
-            closeText.text = "FECHAR";
+            closeLabel = closeText;
+            closeLabel.text = LocalizationManager.Get("common.close");
             close.onClick.AddListener(Close);
             Image panelBackground = panel.GetComponent<Image>();
             for (int i = 0; i < VisibleUpgrades.Length; i++)
@@ -380,7 +410,8 @@ namespace GameJamOcean.Progression
                 int capturedLevel = level;
                 boatButtons[level - 1] = ButtonUI($"Boat {level}", content, new Vector2(135, 100),
                     new Vector2((level - 2) * 150, -740), out TMP_Text boatText);
-                boatText.text = $"BARCO {level}";
+                boatLabels[level - 1] = boatText;
+                boatText.text = LocalizationManager.Get("upgrade.boat_label", level);
                 boatText.rectTransform.anchorMin = boatText.rectTransform.anchorMax =
                     boatText.rectTransform.pivot = new Vector2(.5f, 1f);
                 boatText.rectTransform.sizeDelta = new Vector2(130, 26);

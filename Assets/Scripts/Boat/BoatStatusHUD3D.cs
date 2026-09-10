@@ -1,4 +1,5 @@
 using GameJamOcean.Combat;
+using GameJamOcean.Localization;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Serialization;
@@ -86,7 +87,7 @@ namespace GameJamOcean.Boat
 
             if (healthText != null)
             {
-                healthText.text = $"CASCO {Mathf.RoundToInt(percentage * 100f)}%";
+                healthText.text = LocalizationManager.Get("hud.hull", Mathf.RoundToInt(percentage * 100f));
             }
         }
 
@@ -100,7 +101,7 @@ namespace GameJamOcean.Boat
 
             if (turboText != null)
             {
-                turboText.text = $"TURBO {Mathf.RoundToInt(percentage * 100f)}%";
+                turboText.text = LocalizationManager.Get("hud.turbo", Mathf.RoundToInt(percentage * 100f));
             }
         }
     }

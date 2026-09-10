@@ -284,11 +284,11 @@ namespace GameJamOcean.Progression
 
         public bool TryPurchase(UpgradeKind kind, int expectedLevel, out string message)
         {
-            if (purchasing) { message = "Compra em andamento."; return false; }
-            if (upgradeCatalog == null) { message = "Catálogo de upgrades não configurado."; return false; }
+            if (purchasing) { message = "upgrade.error.in_progress"; return false; }
+            if (upgradeCatalog == null) { message = "upgrade.error.catalog_missing"; return false; }
             if (!upgradeCatalog.Validate(out message)) return false;
             var definition = upgradeCatalog.Find(kind);
-            if (definition == null) { message = "Upgrade desconhecido."; return false; }
+            if (definition == null) { message = "upgrade.error.unknown"; return false; }
             int level = GetLevel(kind);
             int gold = totalGold;
             if (!UpgradePurchaseRules.TryApply(ref gold, ref level, expectedLevel,

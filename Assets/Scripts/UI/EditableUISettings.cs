@@ -31,6 +31,9 @@ namespace GameJamOcean.UI
         [Header("Game Cursor")]
         public Texture2D gameCursor;
         public Vector2 cursorHotspot = Vector2.zero;
+        [Header("Language Flags")]
+        [Tooltip("Atlas Bandeiras.png. Brazil and USA are cropped by UV at runtime without duplicating textures.")]
+        public Texture2D languageFlagsAtlas;
 
         public GameObject Panel(EditableUIPanelKind kind) => kind switch
         {

@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using GameJamOcean.Localization;
 
 namespace GameJamOcean.Interaction
 {
@@ -17,7 +18,7 @@ namespace GameJamOcean.Interaction
 
         private bool isLoading;
 
-        public string Prompt => prompt;
+        public string Prompt => LocalizationManager.Get("interaction.enter_dive");
 
         private void Awake()
         {

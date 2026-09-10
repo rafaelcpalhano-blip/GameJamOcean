@@ -1,4 +1,5 @@
 using TMPro;
+using GameJamOcean.Localization;
 using UnityEngine;
 
 namespace GameJamOcean.Interaction
@@ -27,6 +28,9 @@ namespace GameJamOcean.Interaction
         private InteractionPromptTarget2D tutorialTarget;
         private float tutorialEndTime;
 
+        private void OnEnable() => LocalizationManager.LanguageChanged += RefreshLanguage;
+        private void OnDisable() => LocalizationManager.LanguageChanged -= RefreshLanguage;
+
         private void Awake()
         {
             // Migrate prompt components already serialized in older scenes.
@@ -53,7 +57,7 @@ namespace GameJamOcean.Interaction
                     && Time.time < tutorialEndTime
                     && IsOnScreen(tutorialTarget.PromptWorldPosition))
                 {
-                    Show(tutorialTarget, firstTimeMessage);
+                    Show(tutorialTarget, LocalizationManager.Get("interaction.press_f_or_click"));
                     return;
                 }
 
@@ -66,7 +70,7 @@ namespace GameJamOcean.Interaction
                 tutorialTarget = newTutorial;
                 tutorialEndTime = Time.time + firstTimeDuration;
                 InteractionDiscoveryStore.MarkSeen(newTutorial.DiscoveryKey);
-                Show(newTutorial, firstTimeMessage);
+                Show(newTutorial, LocalizationManager.Get("interaction.press_f_or_click"));
                 return;
             }
 
@@ -192,6 +196,12 @@ namespace GameJamOcean.Interaction
             {
                 promptText.enabled = false;
             }
+        }
+
+        private void RefreshLanguage()
+        {
+            if (promptText != null && promptText.enabled && tutorialTarget != null)
+                promptText.text = LocalizationManager.Get("interaction.press_f_or_click");
         }
 
         private void FindReferencesIfNeeded()

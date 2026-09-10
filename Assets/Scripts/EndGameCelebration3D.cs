@@ -2,6 +2,7 @@ using System.Collections;
 using GameJamOcean.Boat;
 using GameJamOcean.CameraSystem;
 using GameJamOcean.UI;
+using GameJamOcean.Localization;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -16,6 +17,8 @@ namespace GameJamOcean.Progression
         private CameraFollow3D cameraFollow;
         private BoatController3D boat;
         private bool boatWasEnabled;
+        private TMP_Text titleText;
+        private TMP_Text bodyText;
 
         public static void Show(GameObject finalVillage)
         {
@@ -83,6 +86,7 @@ namespace GameJamOcean.Progression
 
         private void OnDestroy()
         {
+            LocalizationManager.LanguageChanged -= RefreshLocalizedTexts;
             GameJamOcean.Audio.GameAudio.Instance?.SetBoatEngineTemporarilyMuted(false);
             GameJamOcean.UI.GameMenus.EndGameActive = false;
         }
@@ -108,28 +112,33 @@ namespace GameJamOcean.Progression
             RectTransform titleRect = titleObject.GetComponent<RectTransform>();
             titleRect.anchorMin = new Vector2(0f, .68f); titleRect.anchorMax = Vector2.one;
             titleRect.offsetMin = new Vector2(35f, 0f); titleRect.offsetMax = new Vector2(-35f, -12f);
-            TextMeshProUGUI title = titleObject.GetComponent<TextMeshProUGUI>();
-            title.text = "PARABÉNS, CAPITÃO!";
-            title.fontSize = 28f;
-            title.alignment = TextAlignmentOptions.Center;
-            title.color = Color.white;
-            GameFontStyles.Apply(title, GameFontRole.Display);
+            titleText = titleObject.GetComponent<TextMeshProUGUI>();
+            titleText.fontSize = 28f;
+            titleText.alignment = TextAlignmentOptions.Center;
+            titleText.color = Color.white;
+            GameFontStyles.Apply(titleText, GameFontRole.Display);
 
             var bodyObject = new GameObject("Body", typeof(RectTransform), typeof(TextMeshProUGUI));
             bodyObject.transform.SetParent(panel.transform, false);
             RectTransform bodyRect = bodyObject.GetComponent<RectTransform>();
             bodyRect.anchorMin = Vector2.zero; bodyRect.anchorMax = new Vector2(1f, .7f);
             bodyRect.offsetMin = new Vector2(35f, 18f); bodyRect.offsetMax = new Vector2(-35f, 0f);
-            TextMeshProUGUI body = bodyObject.GetComponent<TextMeshProUGUI>();
-            body.text = "Você ajudou a transformar a Ilha do Campeche em um lugar cheio de vida, esperança e novos começos.\n"
-                + "O farol agora brilha por todos que chamam esta ilha de lar.";
-            body.fontSize = 24f;
-            body.enableAutoSizing = true;
-            body.fontSizeMin = 20f;
-            body.fontSizeMax = 24f;
-            body.alignment = TextAlignmentOptions.Center;
-            body.color = Color.white;
-            GameFontStyles.Apply(body, GameFontRole.General);
+            bodyText = bodyObject.GetComponent<TextMeshProUGUI>();
+            bodyText.fontSize = 24f;
+            bodyText.enableAutoSizing = true;
+            bodyText.fontSizeMin = 20f;
+            bodyText.fontSizeMax = 24f;
+            bodyText.alignment = TextAlignmentOptions.Center;
+            bodyText.color = Color.white;
+            GameFontStyles.Apply(bodyText, GameFontRole.General);
+            LocalizationManager.LanguageChanged += RefreshLocalizedTexts;
+            RefreshLocalizedTexts();
+        }
+
+        private void RefreshLocalizedTexts()
+        {
+            if (titleText != null) titleText.text = LocalizationManager.Get("ending.title");
+            if (bodyText != null) bodyText.text = LocalizationManager.Get("ending.body");
         }
     }
 }

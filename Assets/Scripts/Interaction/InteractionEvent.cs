@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.Events;
+using GameJamOcean.Localization;
 
 namespace GameJamOcean.Interaction
 {
@@ -20,7 +21,7 @@ namespace GameJamOcean.Interaction
         [SerializeField] private bool logInteraction = true;
         [SerializeField] private UnityEvent onInteracted = new();
 
-        public string Prompt => prompt;
+        public string Prompt => LocalizationManager.Get("interaction.interact");
 
         private void Awake()
         {

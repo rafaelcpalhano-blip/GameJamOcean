@@ -27,3 +27,4 @@ MonoBehaviour:
   cashbackButtonClickVolume: 1
   gameCursor: {fileID: 2800000, guid: f75349a286817b6479976a10636d3b2c, type: 3}
   cursorHotspot: {x: 25, y: 17}
+  languageFlagsAtlas: {fileID: 2800000, guid: 42c12f1898107034cbab49e3afd150a0, type: 3}

@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.Events;
+using GameJamOcean.Localization;
 
 namespace GameJamOcean.Interaction
 {
@@ -16,7 +17,9 @@ namespace GameJamOcean.Interaction
         [Header("Future Panel / Other Actions")]
         [SerializeField] private UnityEvent onInteracted = new();
         private float nextInteractionTime;
-        public string Prompt => prompt;
+        public string Prompt => discoveryKey == "PortUpgrades"
+            ? LocalizationManager.Get("interaction.open_upgrades")
+            : LocalizationManager.Get("interaction.interact");
         public UnityEvent OnInteracted => onInteracted;
 
         private void Awake()

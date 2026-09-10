@@ -1,6 +1,7 @@
 using System.Collections;
 using GameJamOcean.Diving;
 using GameJamOcean.Interaction;
+using GameJamOcean.Localization;
 using GameJamOcean.Player;
 using UnityEngine;
 using UnityEngine.Events;
@@ -69,7 +70,7 @@ namespace GameJamOcean.Rewards
 
         private BoxCollider2D chestCollider;
 
-        public string Prompt => prompt;
+        public string Prompt => LocalizationManager.Get("interaction.open_chest");
         public bool IsOpened => opened;
         public ChestRewardType ChestType => chestType;
 

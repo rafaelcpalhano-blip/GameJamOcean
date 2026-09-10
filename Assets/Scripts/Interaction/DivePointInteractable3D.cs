@@ -1,6 +1,7 @@
 using System.Collections;
 using GameJamOcean.Boat;
 using GameJamOcean.Spawning;
+using GameJamOcean.Localization;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -22,7 +23,7 @@ namespace GameJamOcean.Interaction
         private BoatController3D transitioningBoat;
         private Rigidbody transitioningBody;
 
-        public string Prompt => prompt;
+        public string Prompt => LocalizationManager.Get("interaction.enter_dive");
 
         private void Awake()
         {
