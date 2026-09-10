@@ -23,5 +23,7 @@ MonoBehaviour:
   buttonClickVolume: 0.5
   buttonHoverSound: {fileID: 8300000, guid: e63d8f5a740581a4687dd9d5f7e16b7a, type: 3}
   buttonHoverVolume: 0.3
+  cashbackButtonClickSound: {fileID: 8300000, guid: b82e5f8c66e949f582f776354b54131b, type: 3}
+  cashbackButtonClickVolume: 1
   gameCursor: {fileID: 2800000, guid: f75349a286817b6479976a10636d3b2c, type: 3}
   cursorHotspot: {x: 25, y: 17}

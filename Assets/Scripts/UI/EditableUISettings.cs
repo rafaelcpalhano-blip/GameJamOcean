@@ -24,6 +24,10 @@ namespace GameJamOcean.UI
         [Range(0f, 2f)] public float buttonClickVolume = 1f;
         public AudioClip buttonHoverSound;
         [Range(0f, 2f)] public float buttonHoverVolume = .6f;
+        [Header("Upgrade Panel Button Audio")]
+        [Tooltip("Clique exclusivo dos botões Vida, Velocidade, Arpão e Conserto.")]
+        public AudioClip cashbackButtonClickSound;
+        [Range(0f, 1f)] public float cashbackButtonClickVolume = 1f;
         [Header("Game Cursor")]
         public Texture2D gameCursor;
         public Vector2 cursorHotspot = Vector2.zero;

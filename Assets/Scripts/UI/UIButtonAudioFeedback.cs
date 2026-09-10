@@ -14,6 +14,9 @@ namespace GameJamOcean.UI
         private EditableUISettings settings;
         private Color colorBeforeHover;
         private bool hoverTintApplied;
+        private AudioClip customClickSound;
+        private float customClickVolume = 1f;
+        private bool useCustomClickSound;
 
         private void Awake()
         {
@@ -27,7 +30,16 @@ namespace GameJamOcean.UI
         {
             if (settings == null || button == null || !button.interactable) return;
             GameJamOcean.Audio.GameAudio.Instance?.PlayUIButtonClick(
-                settings.buttonClickSound, settings.buttonClickVolume);
+                useCustomClickSound ? customClickSound : settings.buttonClickSound,
+                useCustomClickSound ? customClickVolume : settings.buttonClickVolume);
+        }
+
+        public void ConfigureClickSound(AudioClip clip, float volume)
+        {
+            customClickSound = clip;
+            customClickVolume = Mathf.Clamp(volume, 0f, 2f);
+            // Once configured, never fall back to the shared click sound on this button.
+            useCustomClickSound = true;
         }
 
         public void OnPointerEnter(PointerEventData eventData)

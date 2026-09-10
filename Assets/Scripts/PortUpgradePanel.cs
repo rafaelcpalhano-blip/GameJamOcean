@@ -259,10 +259,10 @@ namespace GameJamOcean.Progression
                 bool maximum = level >= definition.MaximumLevel;
                 var next = definition.Tier(Mathf.Min(definition.MaximumLevel, level + 1));
                 upgradeNames[i].text = firstPierUpgrade && kind == UpgradeKind.Island
-                    ? "PIER" : $"{definition.displayName}  |  N{level}";
+                    ? "PIER" : UpgradeTitle(kind, level);
                 labels[i].text = firstPierUpgrade && kind == UpgradeKind.Island
                     ? "O primeiro passo para melhorar o comércio marítimo; o próximo será nosso farol!"
-                    : maximum ? "Nível máximo" : $"N{level + 1}: {Describe(definition.kind, next, level + 1)}";
+                    : maximum ? "Nível máximo" : $"Nível {level + 1}: {Describe(definition.kind, next, level + 1)}";
                 prices[i].text = maximum ? "MÁXIMO" : $"{next.goldCost} OURO\nCOMPRAR";
                 buttons[i].interactable = !maximum && progress.TotalGold >= next.goldCost;
                 if (kind == UpgradeKind.Island && (villageLevel1 == null || villageLevel2 == null || villageLevel3 == null || villageLevel4 == null)) buttons[i].interactable = false;
@@ -275,16 +275,48 @@ namespace GameJamOcean.Progression
 
         private static string Describe(UpgradeKind kind, UpgradeTier tier, int level)
         {
-            if (kind == UpgradeKind.Island) return level == 4 ? "Aldeia final — conclusão do jogo" : "Nova aparência da aldeia";
-            if (kind == UpgradeKind.Harpoon) return level == 4 ? "Disparo duplo permanente" : tier.harpoonPrefab != null ? tier.harpoonPrefab.name : "Prefab ausente";
-            if (kind == UpgradeKind.DiverHealth) return $"{tier.value:0} pontos de vida";
-            if (kind == UpgradeKind.BoatHull)
+            if (kind == UpgradeKind.Island) return level switch
             {
-                var turbo = GameProgress.HasInstance ? GameProgress.Instance.Catalog?.Find(UpgradeKind.BoatTurbo) : null;
-                float turboValue = turbo != null ? turbo.Tier(level).value : 0f;
-                return $"Casco +{tier.value:0.#}% / Turbo +{turboValue:0.#}%";
-            }
+                2 => "Mais moradores chegando, as condições da ilha estão melhorando.",
+                3 => "A construção do farol será um grande avanço para ilha.",
+                4 => "Acenda a luz do farol, e traga segurança para a nossa pequena ilha.",
+                _ => "Nova aparência da ilha."
+            };
+            if (kind == UpgradeKind.BoatHull) return level switch
+            {
+                2 => "Casco +15% / Turbo +20% sobre o valor inicial",
+                3 => "Casco +30% / Turbo +40% sobre o valor inicial",
+                _ => "Nível máximo"
+            };
+            if (kind == UpgradeKind.DiverHealth) return "+2 pontos de vida.";
+            if (kind == UpgradeKind.DiverSpeed) return level switch
+            {
+                2 => "15% sobre o valor inicial",
+                3 => "30% sobre o valor inicial",
+                _ => "Nível máximo"
+            };
+            if (kind == UpgradeKind.Harpoon) return level switch
+            {
+                2 => "Velocidade +2 / Distância +6",
+                3 => "Velocidade +4 / Distância +10 / Dano +1",
+                4 => "Projétil duplo",
+                _ => "Nível máximo"
+            };
             return $"+{tier.value:0.#}% sobre o valor inicial";
+        }
+
+        private static string UpgradeTitle(UpgradeKind kind, int level)
+        {
+            string name = kind switch
+            {
+                UpgradeKind.Island => "Ilha",
+                UpgradeKind.BoatHull => "Embarcação",
+                UpgradeKind.DiverHealth => "Mergulhador - Vida",
+                UpgradeKind.DiverSpeed => "Mergulhador - Velocidade",
+                UpgradeKind.Harpoon => "Mergulhador - Arpão",
+                _ => kind.ToString()
+            };
+            return $"{name} | Atual Nível {level}";
         }
 
         private void BuildPanel()
@@ -335,9 +367,12 @@ namespace GameJamOcean.Progression
                 prices[i].lineSpacing = -10f;
                 int index = i;
                 buttons[i].onClick.AddListener(() => Buy(index));
+                if (i >= 2)
+                    ConfigureCashbackClick(buttons[i]);
             }
             repairButton = ButtonUI("Repair Boat", content, new Vector2(540, 55), new Vector2(0, -545), out repairPrice);
             repairButton.onClick.AddListener(RepairBoat);
+            ConfigureCashbackClick(repairButton);
             statusLabel = Label("Status", content, new Vector2(820, 90), new Vector2(0, -615), "", 21);
             for (int level = 1; level <= 3; level++)
             {
@@ -357,6 +392,16 @@ namespace GameJamOcean.Progression
                 boatButtons[level - 1].onClick.AddListener(() => SelectBoat(capturedLevel));
             }
             modal.SetActive(false);
+        }
+
+        private void ConfigureCashbackClick(Button button)
+        {
+            GameJamOcean.UI.EditableUISettings settings = GameJamOcean.UI.EditableUIFactory.Settings;
+            if (button != null && settings != null
+                && button.TryGetComponent(out GameJamOcean.UI.UIButtonAudioFeedback feedback))
+                feedback.ConfigureClickSound(
+                    settings.cashbackButtonClickSound,
+                    settings.cashbackButtonClickVolume);
         }
 
         private void ShowUpgradeAcquiredColor()

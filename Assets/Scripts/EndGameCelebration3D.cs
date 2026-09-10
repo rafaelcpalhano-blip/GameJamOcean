@@ -104,7 +104,7 @@ namespace GameJamOcean.Progression
             textRect.anchorMin = Vector2.zero; textRect.anchorMax = Vector2.one;
             textRect.offsetMin = new Vector2(35, 22); textRect.offsetMax = new Vector2(-35, -22);
             TextMeshProUGUI label = text.GetComponent<TextMeshProUGUI>();
-            label.text = "PARABÉNS, CAPITÃO!\nA aldeia alcançou seu nível máximo. Obrigado por devolver vida e esperança a esta ilha!";
+            label.text = "PARABÉNS, CAPITÃO!\nA ilha alcançou seu nível máximo. Obrigado por devolver vida e esperança a esta ilha!";
             label.fontSize = 30; label.alignment = TextAlignmentOptions.Center; label.color = Color.white;
         }
     }

@@ -56,7 +56,7 @@ MonoBehaviour:
   boat2Engine: {fileID: 8300000, guid: a7622c8e5a6d3b14683d87d1e94f4855, type: 3}
   boat2EngineVolume: 0.4
   boat3Engine: {fileID: 8300000, guid: e17a0650c43a2644ba4d488a70dba822, type: 3}
-  boat3EngineVolume: 0.4
+  boat3EngineVolume: 0.25
   engineVolumeTransitionSpeed: 3
   engineMenuMuteTransitionSpeed: 8
   randomMinimumInterval: 2
