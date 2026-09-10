@@ -13,6 +13,28 @@ namespace GameJamOcean.Audio
     [CreateAssetMenu(menuName = "GameJamOcean/Audio Settings")]
     public sealed class OceanAudioSettings : ScriptableObject
     {
+        [Header("Ocean Environment")]
+        [Tooltip("Skybox material used throughout OceanScene_3D. Leave empty to use the camera background color.")]
+        public Material oceanSkybox;
+        [Tooltip("Visual exposure of the selected skybox without modifying the imported material asset.")]
+        [Range(.1f, 2f)] public float oceanSkyboxExposure = .9f;
+        [Tooltip("Amount of indirect light contributed by the skybox to the scene.")]
+        [Range(0f, 2f)] public float oceanAmbientIntensity = .85f;
+        [Tooltip("Intensity of skybox reflections on scene materials.")]
+        [Range(0f, 2f)] public float oceanReflectionIntensity = .85f;
+        [Tooltip("Softly blends distant ocean geometry into the sky at the horizon.")]
+        public bool oceanHorizonFog = true;
+        public Color oceanHorizonFogColor = new(.29f, .58f, .72f, 1f);
+        [Min(0f)] public float oceanHorizonFogStart = 105f;
+        [Min(.1f)] public float oceanHorizonFogEnd = 185f;
+        [Tooltip("World-space soft band placed around the physical outer edge of the ocean.")]
+        public bool oceanHorizonBlend = true;
+        public Material oceanHorizonBlendMaterial;
+        public Color oceanHorizonBlendColor = new(.54f, .76f, .8f, 1f);
+        [Range(0f, .75f)] public float oceanHorizonBlendOpacity = .38f;
+        [Min(.5f)] public float oceanHorizonBlendWorldHeight = 7f;
+        [Min(0f)] public float oceanHorizonBlendInset = .5f;
+
         [Header("Scene Ambience and Music")]
         public AudioClip oceanAmbience;
         [Range(0f, 1f)] public float oceanAmbienceVolume = .65f;

@@ -1,17 +1,17 @@
 using System.Collections;
 using GameJamOcean.Boat;
 using GameJamOcean.CameraSystem;
+using GameJamOcean.UI;
 using TMPro;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace GameJamOcean.Progression
 {
     public sealed class EndGameCelebration3D : MonoBehaviour
     {
-        [SerializeField, Min(5f)] private float sightseeingSeconds = 30f;
-        [SerializeField, Min(.5f)] private float fadeSeconds = 4f;
+        [SerializeField, Min(1f)] private float sightseeingSeconds = 10f;
+        [SerializeField, Min(.25f)] private float fadeSeconds = 1.5f;
         private CanvasGroup group;
         private CameraFollow3D cameraFollow;
         private BoatController3D boat;
@@ -56,11 +56,6 @@ namespace GameJamOcean.Progression
             while (sightseeing < sightseeingSeconds)
             {
                 sightseeing += Time.unscaledDeltaTime;
-                bool keyboardSkip = Keyboard.current != null && Keyboard.current.anyKey.wasPressedThisFrame;
-                bool mouseSkip = Mouse.current != null && (Mouse.current.leftButton.wasPressedThisFrame
-                    || Mouse.current.rightButton.wasPressedThisFrame);
-                // Avoid consuming the same click that bought the final upgrade.
-                if (sightseeing > 1f && (keyboardSkip || mouseSkip)) break;
                 yield return null;
             }
             float elapsed = 0f;
@@ -70,6 +65,15 @@ namespace GameJamOcean.Progression
                 group.alpha = 1f - Mathf.Clamp01(elapsed / fadeSeconds);
                 yield return null;
             }
+            group.alpha = 0f;
+            group.interactable = false;
+            group.blocksRaycasts = false;
+
+            // The message has its own short lifetime, but the achievement panorama
+            // continues until the camera has completed one full revolution.
+            while (cameraFollow != null && !cameraFollow.EndGameOrbitCompleted)
+                yield return null;
+
             cameraFollow?.EndEndGameOrbit();
             if (boat != null && boatWasEnabled) boat.enabled = true;
             GameJamOcean.Audio.GameAudio.Instance?.SetBoatEngineTemporarilyMuted(false);
@@ -96,16 +100,36 @@ namespace GameJamOcean.Progression
             panel.transform.SetParent(transform, false);
             RectTransform rect = panel.GetComponent<RectTransform>();
             rect.anchorMin = new Vector2(.5f, .72f); rect.anchorMax = new Vector2(.5f, .72f);
-            rect.pivot = new Vector2(.5f, .5f); rect.sizeDelta = new Vector2(820, 190);
+            rect.pivot = new Vector2(.5f, .5f); rect.sizeDelta = new Vector2(820, 220);
             panel.GetComponent<Image>().color = new Color(.015f, .07f, .1f, .72f);
-            var text = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
-            text.transform.SetParent(panel.transform, false);
-            RectTransform textRect = text.GetComponent<RectTransform>();
-            textRect.anchorMin = Vector2.zero; textRect.anchorMax = Vector2.one;
-            textRect.offsetMin = new Vector2(35, 22); textRect.offsetMax = new Vector2(-35, -22);
-            TextMeshProUGUI label = text.GetComponent<TextMeshProUGUI>();
-            label.text = "PARABÉNS, CAPITÃO!\nA ilha alcançou seu nível máximo. Obrigado por devolver vida e esperança a esta ilha!";
-            label.fontSize = 30; label.alignment = TextAlignmentOptions.Center; label.color = Color.white;
+
+            var titleObject = new GameObject("Title", typeof(RectTransform), typeof(TextMeshProUGUI));
+            titleObject.transform.SetParent(panel.transform, false);
+            RectTransform titleRect = titleObject.GetComponent<RectTransform>();
+            titleRect.anchorMin = new Vector2(0f, .68f); titleRect.anchorMax = Vector2.one;
+            titleRect.offsetMin = new Vector2(35f, 0f); titleRect.offsetMax = new Vector2(-35f, -12f);
+            TextMeshProUGUI title = titleObject.GetComponent<TextMeshProUGUI>();
+            title.text = "PARABÉNS, CAPITÃO!";
+            title.fontSize = 28f;
+            title.alignment = TextAlignmentOptions.Center;
+            title.color = Color.white;
+            GameFontStyles.Apply(title, GameFontRole.Display);
+
+            var bodyObject = new GameObject("Body", typeof(RectTransform), typeof(TextMeshProUGUI));
+            bodyObject.transform.SetParent(panel.transform, false);
+            RectTransform bodyRect = bodyObject.GetComponent<RectTransform>();
+            bodyRect.anchorMin = Vector2.zero; bodyRect.anchorMax = new Vector2(1f, .7f);
+            bodyRect.offsetMin = new Vector2(35f, 18f); bodyRect.offsetMax = new Vector2(-35f, 0f);
+            TextMeshProUGUI body = bodyObject.GetComponent<TextMeshProUGUI>();
+            body.text = "Você ajudou a transformar a Ilha do Campeche em um lugar cheio de vida, esperança e novos começos.\n"
+                + "O farol agora brilha por todos que chamam esta ilha de lar.";
+            body.fontSize = 24f;
+            body.enableAutoSizing = true;
+            body.fontSizeMin = 20f;
+            body.fontSizeMax = 24f;
+            body.alignment = TextAlignmentOptions.Center;
+            body.color = Color.white;
+            GameFontStyles.Apply(body, GameFontRole.General);
         }
     }
 }

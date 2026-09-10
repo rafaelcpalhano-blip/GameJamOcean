@@ -12,6 +12,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3e100623910245f795fc930050783e54, type: 3}
   m_Name: OceanAudioSettings
   m_EditorClassIdentifier: Assembly-CSharp::GameJamOcean.Audio.OceanAudioSettings
+  oceanSkybox: {fileID: 2100000, guid: d48a7646f5d0547e889733d84b50cb9f, type: 2}
+  oceanSkyboxExposure: 0.9
+  oceanAmbientIntensity: 0.85
+  oceanReflectionIntensity: 0.85
+  oceanHorizonFog: 1
+  oceanHorizonFogColor: {r: 0.29, g: 0.58, b: 0.72, a: 1}
+  oceanHorizonFogStart: 105
+  oceanHorizonFogEnd: 185
+  oceanHorizonBlend: 1
+  oceanHorizonBlendMaterial: {fileID: 2100000, guid: b17fd06429c14a68ae35e907c2b8416d, type: 2}
+  oceanHorizonBlendColor: {r: 0.54, g: 0.76, b: 0.8, a: 1}
+  oceanHorizonBlendOpacity: 0.38
+  oceanHorizonBlendWorldHeight: 7
+  oceanHorizonBlendInset: 0.5
   oceanAmbience: {fileID: 8300000, guid: e3a8d45612da4624cb7f92d756639be1, type: 3}
   oceanAmbienceVolume: 0.4
   oceanMusic: {fileID: 8300000, guid: 872455cc7cdca2c49a95dec55f4333bf, type: 3}

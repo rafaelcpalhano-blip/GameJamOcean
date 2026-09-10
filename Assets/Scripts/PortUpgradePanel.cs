@@ -326,6 +326,7 @@ namespace GameJamOcean.Progression
             Canvas canvas = modal.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 1000;
+            canvas.pixelPerfect = true;
             CanvasScaler scaler = modal.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920, 1080);
@@ -378,8 +379,8 @@ namespace GameJamOcean.Progression
             {
                 int capturedLevel = level;
                 boatButtons[level - 1] = ButtonUI($"Boat {level}", content, new Vector2(135, 100),
-                    new Vector2(-245 + (level - 1) * 150, -740), out TMP_Text boatText);
-                boatText.text = $"BOAT {level}";
+                    new Vector2((level - 2) * 150, -740), out TMP_Text boatText);
+                boatText.text = $"BARCO {level}";
                 boatText.rectTransform.anchorMin = boatText.rectTransform.anchorMax =
                     boatText.rectTransform.pivot = new Vector2(.5f, 1f);
                 boatText.rectTransform.sizeDelta = new Vector2(130, 26);

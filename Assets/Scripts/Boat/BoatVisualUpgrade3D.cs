@@ -14,6 +14,7 @@ namespace GameJamOcean.Boat
         private Vector3[] variantColliderCenters;
         private Vector3[] variantColliderSizes;
         private bool[] variantColliderValid;
+        private Vector3[] variantRestPositions;
         private Vector3 expectedColliderCenter;
         private Vector3 expectedColliderSize;
         private bool hasExpectedCollider;
@@ -69,6 +70,7 @@ namespace GameJamOcean.Boat
             variantColliderCenters = new Vector3[prefabs.Length];
             variantColliderSizes = new Vector3[prefabs.Length];
             variantColliderValid = new bool[prefabs.Length];
+            variantRestPositions = new Vector3[prefabs.Length];
             for (int i = 0; i < prefabs.Length; i++)
             {
                 variants[i] = Instantiate(prefabs[i], holder);
@@ -78,7 +80,8 @@ namespace GameJamOcean.Boat
                 GameObject variant = variants[i];
                 variant.transform.SetParent(holder, false);
                 // The cargo hull needs a tiny extra waterline clearance while pitching under turbo.
-                variant.transform.localPosition = Vector3.up * (i == 2 ? .12f : 0f);
+                variantRestPositions[i] = Vector3.up * (i == 2 ? .12f : 0f);
+                variant.transform.localPosition = variantRestPositions[i];
                 variant.transform.localRotation = Quaternion.identity;
                 variant.transform.localScale = Vector3.one;
                 foreach (Collider collider in variant.GetComponentsInChildren<Collider>(true))
@@ -137,7 +140,11 @@ namespace GameJamOcean.Boat
             ApplyExpectedCollider();
         }
 
-        private void LateUpdate() => ApplyExpectedCollider();
+        private void LateUpdate()
+        {
+            ApplyExpectedCollider();
+            ApplyExpectedVisualPoses();
+        }
 
         private void ApplyExpectedCollider()
         {
@@ -146,19 +153,56 @@ namespace GameJamOcean.Boat
             if (physicalCollider.size != expectedColliderSize) physicalCollider.size = expectedColliderSize;
         }
 
+        private void ApplyExpectedVisualPoses()
+        {
+            if (variants == null || variantRestPositions == null) return;
+            for (int i = 0; i < variants.Length && i < variantRestPositions.Length; i++)
+            {
+                GameObject variant = variants[i];
+                if (variant == null) continue;
+                Transform visual = variant.transform;
+                if (visual.localPosition != variantRestPositions[i])
+                    visual.localPosition = variantRestPositions[i];
+                if (visual.localRotation != Quaternion.identity)
+                    visual.localRotation = Quaternion.identity;
+                if (visual.localScale != Vector3.one)
+                    visual.localScale = Vector3.one;
+            }
+        }
+
         private void CachePhysicalCollider(int index)
         {
             Renderer[] renderers = variants[index].GetComponentsInChildren<Renderer>(false);
             if (renderers.Length == 0) return;
-            Bounds local = new(transform.InverseTransformPoint(renderers[0].bounds.center), Vector3.zero);
+            Bounds local = default;
+            bool hasLocalBounds = false;
             foreach (Renderer renderer in renderers)
             {
-                Bounds bounds = renderer.bounds;
+                // Renderer.bounds is an axis-aligned world box. Converting that box back to
+                // boat space inflates the hull whenever a saved boat returns at an angle.
+                // Transform the renderer's own local bounds instead so the result is stable
+                // for every boat rotation and every scene reload.
+                Bounds bounds = renderer.localBounds;
                 for (int corner = 0; corner < 8; corner++)
-                    local.Encapsulate(transform.InverseTransformPoint(bounds.center + Vector3.Scale(bounds.extents,
-                        new Vector3((corner & 1) == 0 ? -1 : 1, (corner & 2) == 0 ? -1 : 1,
-                            (corner & 4) == 0 ? -1 : 1))));
+                {
+                    Vector3 rendererPoint = bounds.center + Vector3.Scale(bounds.extents,
+                        new Vector3((corner & 1) == 0 ? -1f : 1f,
+                            (corner & 2) == 0 ? -1f : 1f,
+                            (corner & 4) == 0 ? -1f : 1f));
+                    Vector3 boatPoint = transform.InverseTransformPoint(
+                        renderer.transform.TransformPoint(rendererPoint));
+                    if (!hasLocalBounds)
+                    {
+                        local = new Bounds(boatPoint, Vector3.zero);
+                        hasLocalBounds = true;
+                    }
+                    else
+                    {
+                        local.Encapsulate(boatPoint);
+                    }
+                }
             }
+            if (!hasLocalBounds) return;
             variantColliderCenters[index] = new Vector3(local.center.x, originalColliderCenter.y, local.center.z);
             variantColliderSizes[index] = new Vector3(local.size.x, originalColliderSize.y, local.size.z);
             variantColliderValid[index] = true;

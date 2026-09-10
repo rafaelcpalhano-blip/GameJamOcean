@@ -14,6 +14,7 @@ namespace GameJamOcean.Weapons
         [SerializeField] private bool hideSystemCursor = true;
 
         private Texture2D dotTexture;
+        private bool systemCursorHiddenByAim;
 
         private void OnEnable()
         {
@@ -21,15 +22,23 @@ namespace GameJamOcean.Weapons
             dotTexture.SetPixel(0, 0, Color.white);
             dotTexture.Apply();
 
-            if (hideSystemCursor)
-            {
-                Cursor.visible = false;
-            }
+            UpdateSystemCursorVisibility();
+        }
+
+        private void Update()
+        {
+            // Browsers can restore the native cursor when the canvas regains focus.
+            // Keep its visibility synchronized with the exact state that draws the aim.
+            UpdateSystemCursorVisibility();
         }
 
         private void OnDisable()
         {
-            Cursor.visible = true;
+            if (systemCursorHiddenByAim)
+            {
+                Cursor.visible = true;
+                systemCursorHiddenByAim = false;
+            }
 
             if (dotTexture != null)
             {
@@ -39,8 +48,7 @@ namespace GameJamOcean.Weapons
 
         private void OnGUI()
         {
-            if (Mouse.current == null || dotTexture == null
-                || GameJamOcean.UI.GameMenus.BlocksGameplay || Time.timeScale <= 0f)
+            if (dotTexture == null || !IsAimActive())
             {
                 return;
             }
@@ -62,6 +70,25 @@ namespace GameJamOcean.Weapons
             GUI.DrawTexture(new Rect(x - thickness * .5f, y + gap,
                 thickness, armLength), dotTexture);
             GUI.color = previousColor;
+        }
+
+        private void UpdateSystemCursorVisibility()
+        {
+            bool shouldHide = hideSystemCursor && IsAimActive();
+            if (Cursor.visible == !shouldHide && systemCursorHiddenByAim == shouldHide)
+            {
+                return;
+            }
+
+            Cursor.visible = !shouldHide;
+            systemCursorHiddenByAim = shouldHide;
+        }
+
+        private static bool IsAimActive()
+        {
+            return Mouse.current != null
+                && !GameJamOcean.UI.GameMenus.BlocksGameplay
+                && Time.timeScale > 0f;
         }
 
         private void OnValidate()

@@ -156,7 +156,9 @@ namespace GameJamOcean.EditorTools
                 return;
             }
             const string materialPath = "Assets/Materials/BoatFoam.mat";
+            const string contactMaterialPath = "Assets/Materials/BoatContactFoam.mat";
             Material material = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
+            Material contactMaterial = AssetDatabase.LoadAssetAtPath<Material>(contactMaterialPath);
             if (material == null)
             {
                 Shader shader = AssetDatabase.LoadAssetAtPath<Shader>("Assets/Materials/BoatFoam.shader");
@@ -170,7 +172,7 @@ namespace GameJamOcean.EditorTools
             }
             BoatFoam3D foam = GetOrAddComponent<BoatFoam3D>(boat);
             Undo.RecordObject(foam, "Configure boat foam");
-            foam.Configure(material, water.transform, boat.GetComponent<BoxCollider>());
+            foam.Configure(material, contactMaterial, water.transform, boat.GetComponent<BoxCollider>());
             EditorUtility.SetDirty(foam);
             AssetDatabase.SaveAssets();
             EditorSceneManager.MarkSceneDirty(scene);
@@ -550,7 +552,7 @@ namespace GameJamOcean.EditorTools
             }
 
             TextMeshProUGUI text = textObject.GetComponent<TextMeshProUGUI>();
-            text.text = "Press F or Click";
+            text.text = InteractionPromptUI2D.DefaultFirstTimeMessage;
             text.fontSize = 24f;
             text.alignment = TextAlignmentOptions.Center;
             text.raycastTarget = false;

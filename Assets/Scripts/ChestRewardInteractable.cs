@@ -48,6 +48,11 @@ namespace GameJamOcean.Rewards
         [SerializeField] private Sprite rewardCoinSprite;
         [SerializeField, Min(1)] private int maximumVisualCoins = 18;
         [SerializeField, Min(0.1f)] private float rewardEffectDuration = 1.2f;
+
+        [Header("Rendering")]
+        [Tooltip("Minimum sorting order used by the chest so it stays above DiveScene backgrounds and their color filter.")]
+        [SerializeField, Min(1)] private int minimumChestSortingOrder = 1;
+
         [Header("Lifetime")]
         [SerializeField] private bool destroyAfterOpening = true;
         [SerializeField, Min(0f)] private float destroyDelay = 1f;
@@ -80,6 +85,7 @@ namespace GameJamOcean.Rewards
 
             FindReferencesIfNeeded();
             ConfigurePromptTarget();
+            KeepChestBetweenBackgroundAndInteractor(player != null ? player.gameObject : null);
         }
 
         private void OnEnable()
@@ -161,6 +167,7 @@ namespace GameJamOcean.Rewards
             }
 
             opened = true;
+            KeepChestBetweenBackgroundAndInteractor(interactor);
             GameJamOcean.Audio.GameAudio.Instance?.PlayChestOpen(chestType == ChestRewardType.Final);
             awardedGold = chestType == ChestRewardType.Final
                 ? sessionManager.CalculateFinalChestReward()
@@ -205,6 +212,38 @@ namespace GameJamOcean.Rewards
             if (destroyAfterOpening)
             {
                 StartCoroutine(DestroyAfterDelay());
+            }
+        }
+
+        private void KeepChestBetweenBackgroundAndInteractor(GameObject interactor)
+        {
+            if (interactor == null)
+            {
+                return;
+            }
+
+            SpriteRenderer interactorRenderer = interactor.GetComponentInChildren<SpriteRenderer>();
+            if (interactorRenderer == null)
+            {
+                return;
+            }
+
+            // The blue overlays used by the optional DiveScene backgrounds render
+            // on the Default sorting layer at order 0. Keep the chest immediately
+            // above that range and the diver one step above the chest. If a scene
+            // already uses higher orders, preserve them instead of lowering them.
+            int interactorOrder = Mathf.Max(
+                interactorRenderer.sortingOrder,
+                minimumChestSortingOrder + 1);
+            interactorRenderer.sortingOrder = interactorOrder;
+
+            SpriteRenderer[] chestRenderers = GetComponentsInChildren<SpriteRenderer>(true);
+            foreach (SpriteRenderer chestRenderer in chestRenderers)
+            {
+                chestRenderer.sortingLayerID = interactorRenderer.sortingLayerID;
+                chestRenderer.sortingOrder = Mathf.Max(
+                    minimumChestSortingOrder,
+                    interactorOrder - 1);
             }
         }
 
@@ -287,6 +326,7 @@ namespace GameJamOcean.Rewards
             minimumGold = Mathf.Max(0, minimumGold);
             maximumGold = Mathf.Max(minimumGold, maximumGold);
             maximumInteractionDistance = Mathf.Max(0f, maximumInteractionDistance);
+            minimumChestSortingOrder = Mathf.Max(1, minimumChestSortingOrder);
             destroyDelay = Mathf.Max(0f, destroyDelay);
         }
     }

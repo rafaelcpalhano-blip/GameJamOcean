@@ -2129,7 +2129,7 @@ MonoBehaviour:
   playerInteractor3D: {fileID: 0}
   worldCamera: {fileID: 519420031}
   promptText: {fileID: 632571151}
-  firstTimeMessage: Press F or Click
+  firstTimeMessage: Pressione F ou Clique
   nearbyMessage: '[ F ]'
   firstTimeDuration: 4
   viewportMargin: 0.03
@@ -2153,7 +2153,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Press F or Click
+  m_text: Pressione F ou Clique
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}

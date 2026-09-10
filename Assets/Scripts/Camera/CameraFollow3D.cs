@@ -35,7 +35,10 @@ namespace GameJamOcean.CameraSystem
         private Vector3 endGameCenter;
         private Vector3 endGameOrbitOffset;
         private float endGameOrbitAngle;
-        [SerializeField, Min(.1f)] private float endGameOrbitDegreesPerSecond = 5f;
+        private float endGameOrbitCurrentSpeed;
+        [SerializeField, Min(.1f)] private float endGameOrbitDegreesPerSecond = 8f;
+        [SerializeField, Min(.1f)] private float endGameOrbitAcceleration = 3f;
+        public bool EndGameOrbitCompleted => endGameOrbitAngle >= 360f;
 
         public void ShowMenuView()
         {
@@ -75,6 +78,7 @@ namespace GameJamOcean.CameraSystem
             Vector3 menu = menuViewPoint != null ? menuViewPoint.position : menuPosition;
             endGameOrbitOffset = menu - center;
             endGameOrbitAngle = 0f;
+            endGameOrbitCurrentSpeed = 0f;
             UpdateEndGameOrbit(0f);
         }
 
@@ -95,7 +99,9 @@ namespace GameJamOcean.CameraSystem
 
         private void UpdateEndGameOrbit(float deltaTime)
         {
-            endGameOrbitAngle += endGameOrbitDegreesPerSecond * deltaTime;
+            endGameOrbitCurrentSpeed = Mathf.MoveTowards(endGameOrbitCurrentSpeed,
+                endGameOrbitDegreesPerSecond, endGameOrbitAcceleration * deltaTime);
+            endGameOrbitAngle += endGameOrbitCurrentSpeed * deltaTime;
             Vector3 horizontal = Quaternion.Euler(0f, endGameOrbitAngle, 0f)
                 * new Vector3(endGameOrbitOffset.x, 0f, endGameOrbitOffset.z);
             Vector3 position = endGameCenter + horizontal;

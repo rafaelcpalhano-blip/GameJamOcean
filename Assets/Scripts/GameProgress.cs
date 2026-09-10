@@ -17,11 +17,19 @@ namespace GameJamOcean.Progression
         [SerializeField] private float[] savedBoatMaximumHealth = { -1f, -1f, -1f };
         [SerializeField] private UnityEvent onGameCompleted = new();
         private const string SaveKey = "GameJamOcean.Progress.v1";
+        private const int CurrentSaveVersion = 2;
         private const int NewGameGold = 100;
+        private const string TutorialsArmedKey = "GameJamOcean.Tutorials.Armed";
+        private const string OceanTutorialKey = "GameJamOcean.Tutorials.OceanShown";
+        private const string DiveTutorialKey = "GameJamOcean.Tutorials.DiveShown";
         private bool purchasing;
         private int pendingGoldDelta;
+        private bool introCompleted;
         [Serializable] private sealed class SaveData
         {
+            public int version;
+            public bool campaignStarted;
+            public bool introCompleted;
             public int gold;
             public int[] levels;
             public int boatDeaths;
@@ -35,13 +43,17 @@ namespace GameJamOcean.Progression
 
         public static GameProgress Instance { get; private set; }
         public static bool HasInstance => Instance != null;
-        public bool HasSavedGame { get; private set; }
+        public bool HasValidCampaign { get; private set; }
+        // Compatibility for code outside this project that may still use the old property name.
+        public bool HasSavedGame => HasValidCampaign;
+        public bool IsIntroPending => HasValidCampaign && !introCompleted;
 
         public event Action<int> TotalGoldChanged;
         public event Action UpgradesChanged;
         public event Action GameCompleted;
         public event Action<int> BoatSelectionChanged;
         public bool IsGameCompleted => GetLevel(UpgradeKind.Island) == 4;
+        public bool IsStartingNewCampaign { get; private set; }
         public UpgradeCatalog Catalog => upgradeCatalog;
 
         public int TotalGold => totalGold;
@@ -109,19 +121,32 @@ namespace GameJamOcean.Progression
             return true;
         }
 
-        public void ResetProgress()
+        public void BeginNewCampaign()
         {
-            totalGold = NewGameGold;
-            pendingGoldDelta = 0;
-            upgradeLevels = new[] { 0, 1, 1, 1, 1, 1 };
-            boatDestructions = 0;
-            selectedBoatLevel = 1;
-            savedBoatHealth = new[] { -1f, -1f, -1f };
-            savedBoatMaximumHealth = new[] { -1f, -1f, -1f };
+            SetDefaultProgress();
+            HasValidCampaign = true;
+            introCompleted = false;
+            GameJamOcean.Boat.OceanReturnState3D.ResetRuntimeState();
+            IsStartingNewCampaign = true;
+            try
+            {
+                // Active scene systems must discard the previous campaign before the scene reloads.
+                UpgradesChanged?.Invoke();
+            }
+            finally
+            {
+                IsStartingNewCampaign = false;
+            }
             SaveProgress();
-            UpgradesChanged?.Invoke();
             onTotalGoldChanged?.Invoke(totalGold);
             TotalGoldChanged?.Invoke(totalGold);
+        }
+
+        public void MarkIntroCompleted()
+        {
+            if (!HasValidCampaign || introCompleted) return;
+            introCompleted = true;
+            SaveProgress();
         }
 
         public int GetLevel(UpgradeKind kind)
@@ -247,9 +272,13 @@ namespace GameJamOcean.Progression
 
         public void SaveProgress()
         {
-            HasSavedGame = true;
+            // Scene objects may report their initial state while the main menu is open.
+            // Such runtime synchronization must never create a campaign.
+            if (!HasValidCampaign) return;
             PlayerPrefs.SetString(SaveKey, JsonUtility.ToJson(new SaveData
-                { gold = totalGold, levels = upgradeLevels, boatDeaths = boatDestructions,
+                { version = CurrentSaveVersion, campaignStarted = true,
+                    introCompleted = introCompleted, gold = totalGold,
+                    levels = upgradeLevels, boatDeaths = boatDestructions,
                     selectedBoat = selectedBoatLevel, boatHealth = savedBoatHealth,
                     boatMaximumHealth = savedBoatMaximumHealth }));
             PlayerPrefs.Save();
@@ -257,13 +286,20 @@ namespace GameJamOcean.Progression
 
         private void LoadProgress()
         {
-            upgradeLevels = new[] { 0, 1, 1, 1, 1, 1 };
-            if (!PlayerPrefs.HasKey(SaveKey)) { totalGold = NewGameGold; return; }
+            SetDefaultProgress();
+            HasValidCampaign = false;
+            introCompleted = false;
+            if (!PlayerPrefs.HasKey(SaveKey)) return;
             try
             {
                 SaveData saved = JsonUtility.FromJson<SaveData>(PlayerPrefs.GetString(SaveKey));
                 if (saved == null) return;
-                HasSavedGame = true;
+                bool legacySave = saved.version < CurrentSaveVersion;
+                bool validCampaign = legacySave ? IsValidLegacyCampaign(saved) : saved.campaignStarted;
+                if (!validCampaign) return;
+
+                HasValidCampaign = true;
+                introCompleted = legacySave ? InferLegacyIntroCompleted(saved) : saved.introCompleted;
                 totalGold = Mathf.Max(0, saved.gold);
                 boatDestructions = Mathf.Max(0, saved.boatDeaths);
                 selectedBoatLevel = Mathf.Clamp(saved.selectedBoat <= 0 ? 1 : saved.selectedBoat, 1, 3);
@@ -277,16 +313,77 @@ namespace GameJamOcean.Progression
                 upgradeLevels[(int)UpgradeKind.BoatHull] = vesselLevel;
                 upgradeLevels[(int)UpgradeKind.BoatTurbo] = vesselLevel;
                 selectedBoatLevel = Mathf.Min(selectedBoatLevel, vesselLevel);
+                if (legacySave) SaveProgress();
             }
             catch (Exception error) { Debug.LogWarning($"Não foi possível ler o progresso: {error.Message}"); }
+        }
+
+        private void SetDefaultProgress()
+        {
+            totalGold = NewGameGold;
+            pendingGoldDelta = 0;
+            upgradeLevels = new[] { 0, 1, 1, 1, 1, 1 };
+            boatDestructions = 0;
+            selectedBoatLevel = 1;
+            savedBoatHealth = new[] { -1f, -1f, -1f };
+            savedBoatMaximumHealth = new[] { -1f, -1f, -1f };
+        }
+
+        private static bool IsValidLegacyCampaign(SaveData saved)
+        {
+            // Every campaign created by the current onboarding writes these keys.
+            // The settings-only bug wrote only default boat health and none of them.
+            if (HasAnyTutorialState()) return true;
+            if (saved.gold != NewGameGold || saved.boatDeaths > 0 || saved.selectedBoat > 1)
+                return true;
+            if (saved.levels != null)
+                for (int i = 0; i < saved.levels.Length; i++)
+                {
+                    int expected = i == 0 ? 0 : 1;
+                    if (saved.levels[i] != expected) return true;
+                }
+            return HasDamagedBoat(saved.boatHealth, saved.boatMaximumHealth);
+        }
+
+        private static bool HasAnyTutorialState()
+        {
+            return PlayerPrefs.HasKey(TutorialsArmedKey)
+                || PlayerPrefs.HasKey(OceanTutorialKey)
+                || PlayerPrefs.HasKey(DiveTutorialKey);
+        }
+
+        private static bool InferLegacyIntroCompleted(SaveData saved)
+        {
+            if (PlayerPrefs.HasKey(OceanTutorialKey))
+                return PlayerPrefs.GetInt(OceanTutorialKey, 0) != 0;
+            // Very old saves with real progress predate the current onboarding keys.
+            // Preserve their established campaign instead of forcing a new introduction.
+            return !HasAnyTutorialState() && IsValidLegacyCampaign(saved);
+        }
+
+        private static bool HasDamagedBoat(float[] health, float[] maximumHealth)
+        {
+            if (health == null || maximumHealth == null) return false;
+            int count = Math.Min(health.Length, maximumHealth.Length);
+            for (int i = 0; i < count; i++)
+                if (health[i] >= 0f && maximumHealth[i] > 0f
+                    && health[i] < maximumHealth[i] - .01f) return true;
+            return false;
         }
 
         private void OnDestroy() { if (Instance == this) Instance = null; }
 
         public static void ResetSavedProgress()
         {
-            if (Instance != null) Instance.ResetProgress();
-            else { PlayerPrefs.DeleteKey(SaveKey); PlayerPrefs.Save(); }
+            PlayerPrefs.DeleteKey(SaveKey);
+            PlayerPrefs.Save();
+            if (Instance == null) return;
+            Instance.SetDefaultProgress();
+            Instance.HasValidCampaign = false;
+            Instance.introCompleted = false;
+            Instance.UpgradesChanged?.Invoke();
+            Instance.onTotalGoldChanged?.Invoke(Instance.totalGold);
+            Instance.TotalGoldChanged?.Invoke(Instance.totalGold);
         }
 
         private void OnValidate()

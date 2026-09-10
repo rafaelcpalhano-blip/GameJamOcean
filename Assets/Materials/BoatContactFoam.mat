@@ -7,8 +7,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: BoatFoam
-  m_Shader: {fileID: 4800000, guid: 4532dfb2d4ac435b92cfd6d21016be84, type: 3}
+  m_Name: BoatContactFoam
+  m_Shader: {fileID: 4800000, guid: d41b7b8c9a3e4f21b673c0a5e9284fd1, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -25,11 +25,11 @@ Material:
     m_TexEnvs:
     - _FoamTex:
         m_Texture: {fileID: 2800000, guid: 054dd1c23a7e11e4090e24b6d47a1377, type: 3}
-        m_Scale: {x: 1, y: 1}
+        m_Scale: {x: 3, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _PatternStrength: 0.45
+    - _Opacity: 1
     m_Colors: []
   m_BuildTextureStacks: []
   m_AllowLocking: 1

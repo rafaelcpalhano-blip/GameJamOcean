@@ -10,74 +10,136 @@ using UnityEngine.SceneManagement;
 
 namespace GameJamOcean.World
 {
-    [DisallowMultipleComponent]
-    public sealed class OceanHorizonBackdrop3D : MonoBehaviour
+    public static class OceanEnvironment3D
     {
+        private static Material runtimeSkybox;
+
         public static void ConfigureScene(Scene scene)
         {
             foreach (GameObject root in scene.GetRootGameObjects())
-                if (root.GetComponentInChildren<OceanHorizonBackdrop3D>(true) != null) return;
-            new GameObject("Fake Sky Horizon").AddComponent<OceanHorizonBackdrop3D>();
-        }
-
-        private void Awake()
-        {
-            transform.position = new Vector3(0f, 35f, 0f);
-            CreateHorizonCylinder();
-            CreateClouds();
-        }
-
-        private void CreateHorizonCylinder()
-        {
-            const int sides = 48;
-            const float radius = 360f;
-            const float height = 150f;
-            var vertices = new Vector3[sides * 2];
-            var triangles = new int[sides * 6];
-            for (int i = 0; i < sides; i++)
             {
-                float angle = i * Mathf.PI * 2f / sides;
-                vertices[i * 2] = new Vector3(Mathf.Cos(angle) * radius, -height * .5f, Mathf.Sin(angle) * radius);
-                vertices[i * 2 + 1] = new Vector3(Mathf.Cos(angle) * radius, height * .5f, Mathf.Sin(angle) * radius);
-                int next = (i + 1) % sides;
-                int t = i * 6;
-                triangles[t] = i * 2; triangles[t + 1] = next * 2 + 1; triangles[t + 2] = i * 2 + 1;
-                triangles[t + 3] = i * 2; triangles[t + 4] = next * 2; triangles[t + 5] = next * 2 + 1;
+                if (root.name == "Fake Sky Horizon") Object.Destroy(root);
             }
-            GameObject sky = new("Blue Sky", typeof(MeshFilter), typeof(MeshRenderer));
-            sky.transform.SetParent(transform, false);
-            var mesh = new Mesh { name = "Fake Sky Horizon Mesh", vertices = vertices, triangles = triangles };
-            mesh.RecalculateBounds(); mesh.RecalculateNormals();
-            sky.GetComponent<MeshFilter>().sharedMesh = mesh;
-            sky.GetComponent<MeshRenderer>().material = Unlit(new Color(.34f, .68f, .9f, 1f));
+
+            OceanAudioSettings settings = Resources.Load<OceanAudioSettings>("OceanAudioSettings");
+            if (runtimeSkybox != null) Object.Destroy(runtimeSkybox);
+            runtimeSkybox = null;
+
+            if (settings != null && settings.oceanSkybox != null)
+            {
+                runtimeSkybox = new Material(settings.oceanSkybox)
+                {
+                    name = settings.oceanSkybox.name + " (Ocean Runtime)",
+                    hideFlags = HideFlags.DontSave
+                };
+                if (runtimeSkybox.HasProperty("_Exposure"))
+                    runtimeSkybox.SetFloat("_Exposure", settings.oceanSkyboxExposure);
+            }
+
+            RenderSettings.skybox = runtimeSkybox;
+            RenderSettings.ambientIntensity = settings != null ? settings.oceanAmbientIntensity : 1f;
+            RenderSettings.reflectionIntensity = settings != null ? settings.oceanReflectionIntensity : 1f;
+            RenderSettings.fog = settings != null && settings.oceanHorizonFog;
+            if (settings != null && settings.oceanHorizonFog)
+            {
+                RenderSettings.fogMode = FogMode.Linear;
+                RenderSettings.fogColor = settings.oceanHorizonFogColor;
+                RenderSettings.fogStartDistance = Mathf.Max(0f, settings.oceanHorizonFogStart);
+                RenderSettings.fogEndDistance = Mathf.Max(
+                    RenderSettings.fogStartDistance + .1f, settings.oceanHorizonFogEnd);
+            }
+            OceanHorizonBlend3D.Ensure(scene, settings);
+            DynamicGI.UpdateEnvironment();
+        }
+    }
+
+    [DisallowMultipleComponent]
+    public sealed class OceanHorizonBlend3D : MonoBehaviour
+    {
+        private Mesh horizonMesh;
+
+        public static void Ensure(Scene scene, OceanAudioSettings configuration)
+        {
+            if (FindFirstObjectByType<OceanHorizonBlend3D>() != null) return;
+            GameObject host = new("Ocean Horizon Blend");
+            SceneManager.MoveGameObjectToScene(host, scene);
+            OceanHorizonBlend3D blend = host.AddComponent<OceanHorizonBlend3D>();
+            blend.Build(configuration);
         }
 
-        private void CreateClouds()
+        private void Build(OceanAudioSettings configuration)
         {
-            for (int group = 0; group < 10; group++)
+            if (configuration == null || !configuration.oceanHorizonBlend
+                || configuration.oceanHorizonBlendMaterial == null) return;
+            GameObject water = GameObject.Find("Water");
+            Renderer waterRenderer = water != null ? water.GetComponent<Renderer>() : null;
+            if (waterRenderer == null) return;
+
+            Bounds bounds = waterRenderer.bounds;
+            float inset = Mathf.Max(0f, configuration.oceanHorizonBlendInset);
+            float minimumX = bounds.min.x + inset;
+            float maximumX = bounds.max.x - inset;
+            float minimumZ = bounds.min.z + inset;
+            float maximumZ = bounds.max.z - inset;
+            float waterY = bounds.max.y;
+            float height = Mathf.Max(.5f, configuration.oceanHorizonBlendWorldHeight);
+            float[] levels = { waterY - 1.25f, waterY - .08f, waterY + height * .18f, waterY + height };
+            float[] alpha = { 0f, 1f, .62f, 0f };
+            Vector2[] corners =
             {
-                float angle = group * Mathf.PI * 2f / 10f + .17f;
-                Vector3 direction = new(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
-                Vector3 center = direction * 300f + Vector3.up * Random.Range(-1f, 24f);
-                for (int puff = 0; puff < 3; puff++)
+                new(minimumX, minimumZ), new(maximumX, minimumZ),
+                new(maximumX, maximumZ), new(minimumX, maximumZ)
+            };
+            const int sides = 4;
+            const int rows = 4;
+            Vector3[] vertices = new Vector3[sides * rows * 2];
+            Color[] colors = new Color[vertices.Length];
+            Vector2[] uvs = new Vector2[vertices.Length];
+            int[] triangles = new int[sides * (rows - 1) * 6];
+            int triangle = 0;
+            for (int side = 0; side < sides; side++)
+            {
+                Vector2 from = corners[side];
+                Vector2 to = corners[(side + 1) % sides];
+                int start = side * rows * 2;
+                for (int row = 0; row < rows; row++)
                 {
-                    GameObject cloud = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                    cloud.name = "Cloud Puff";
-                    cloud.transform.SetParent(transform, false);
-                    cloud.transform.localPosition = center + new Vector3((puff - 1) * 8f, puff == 1 ? 3f : 0f, 0f);
-                    cloud.transform.localScale = new Vector3(14f, 4.5f, 5f);
-                    Destroy(cloud.GetComponent<Collider>());
-                    cloud.GetComponent<Renderer>().material = Unlit(new Color(1f, 1f, 1f, .78f));
+                    int index = start + row * 2;
+                    vertices[index] = new Vector3(from.x, levels[row], from.y);
+                    vertices[index + 1] = new Vector3(to.x, levels[row], to.y);
+                    colors[index] = colors[index + 1] = new Color(1f, 1f, 1f, alpha[row]);
+                    uvs[index] = new Vector2(0f, row / (rows - 1f));
+                    uvs[index + 1] = new Vector2(1f, row / (rows - 1f));
+                    if (row >= rows - 1) continue;
+                    triangles[triangle++] = index;
+                    triangles[triangle++] = index + 3;
+                    triangles[triangle++] = index + 1;
+                    triangles[triangle++] = index;
+                    triangles[triangle++] = index + 2;
+                    triangles[triangle++] = index + 3;
                 }
             }
+
+            horizonMesh = new Mesh { name = "Ocean Horizon Perimeter" };
+            horizonMesh.vertices = vertices;
+            horizonMesh.colors = colors;
+            horizonMesh.uv = uvs;
+            horizonMesh.triangles = triangles;
+            horizonMesh.RecalculateBounds();
+            gameObject.AddComponent<MeshFilter>().sharedMesh = horizonMesh;
+            MeshRenderer meshRenderer = gameObject.AddComponent<MeshRenderer>();
+            meshRenderer.sharedMaterial = configuration.oceanHorizonBlendMaterial;
+            meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            meshRenderer.receiveShadows = false;
+            MaterialPropertyBlock properties = new();
+            properties.SetColor("_Tint", configuration.oceanHorizonBlendColor);
+            properties.SetFloat("_Opacity", configuration.oceanHorizonBlendOpacity);
+            meshRenderer.SetPropertyBlock(properties);
         }
 
-        private static Material Unlit(Color color)
+        private void OnDestroy()
         {
-            Shader shader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Color");
-            var material = new Material(shader) { color = color };
-            material.SetColor("_BaseColor", color);
-            return material;
+            if (horizonMesh != null) Destroy(horizonMesh);
         }
     }
 

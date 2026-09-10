@@ -12,6 +12,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.SceneManagement;
+using UnityEngine.TextCore.LowLevel;
 using UnityEngine.UI;
 
 namespace GameJamOcean.UI
@@ -34,6 +35,7 @@ namespace GameJamOcean.UI
         private bool firstScene = true, requestMain, main, open, loading;
         private bool requestIntro, transitioning;
         private bool showingLetter;
+        private bool showingCampaignIntro;
         private Coroutine typewriter;
         private Coroutine continuePromptBlink;
         private TMP_Text continuePrompt;
@@ -106,7 +108,7 @@ namespace GameJamOcean.UI
             if (scene.name == Ocean) OceanGoldHUD.Ensure();
             if (scene.name == Ocean) GameJamOcean.Boat.BoatVisualUpgrade3D.ConfigureScene(scene);
             if (scene.name == Ocean) GameJamOcean.World.LighthouseEndGameLight3D.ConfigureScene(scene);
-            if (scene.name == Ocean) GameJamOcean.World.OceanHorizonBackdrop3D.ConfigureScene(scene);
+            if (scene.name == Ocean) GameJamOcean.World.OceanEnvironment3D.ConfigureScene(scene);
             if (scene.name == Ocean) GameJamOcean.World.OceanVfxScene3D.ConfigureScene(scene);
             loading = false;
             bool showMain = scene.name == Ocean && (firstScene || requestMain);
@@ -150,6 +152,11 @@ namespace GameJamOcean.UI
                     showingLetter = false;
                     StopTypewriter();
                     gameAudio.StopLetter();
+                    if (showingCampaignIntro)
+                    {
+                        showingCampaignIntro = false;
+                        GameProgress.Instance?.MarkIntroCompleted();
+                    }
                     StartGameplay();
                 }
                 return;
@@ -222,7 +229,7 @@ namespace GameJamOcean.UI
             return texture;
         }
 
-        private void Freeze(bool isMain)
+        private void Freeze(bool isMain, bool keepWorldFlowing = false)
         {
             main = isMain;
             savedTimeScale = Time.timeScale;
@@ -230,7 +237,7 @@ namespace GameJamOcean.UI
             savedCursorVisible = Cursor.visible;
             savedCursorLock = Cursor.lockState;
             open = true;
-            if (!isMain)
+            if (!isMain && !keepWorldFlowing)
             {
                 Time.timeScale = 0f;
                 AudioListener.pause = true;
@@ -284,7 +291,12 @@ namespace GameJamOcean.UI
         private void StartGameplay()
         {
             if (transitioning) return;
-            GameProgress.Instance.SaveProgress();
+            if (GameProgress.Instance == null || !GameProgress.Instance.HasValidCampaign)
+            {
+                Debug.LogWarning("Gameplay bloqueada porque não existe uma campanha válida.", this);
+                ShowHome();
+                return;
+            }
             transitioning = true;
             canvas.gameObject.SetActive(false);
             StartCoroutine(EnterGameplay());
@@ -292,26 +304,38 @@ namespace GameJamOcean.UI
 
         private void ShowLetter()
         {
-            GameProgress.Instance.SaveProgress();
+            if (GameProgress.Instance == null || !GameProgress.Instance.HasValidCampaign)
+            {
+                ShowHome();
+                return;
+            }
             showingLetter = true;
+            showingCampaignIntro = true;
             letterFrame = Time.frameCount;
             ClearPanel("UMA NOVA VIDA", EditableUIPanelKind.TutorialPanel);
-            TMP_Text body = Label("<b>Um bom lugar para começar uma vida de mergulhador profissional, não acha?</b>\n\n"
-                + "Dizem que tesouros e riquezas esquecidas aguardam nas profundezas.\n"
-                + "Quanto mais você conquistar, mais poderá melhorar suas instalações, seu transporte e seus equipamentos. "
-                + "Mas não se engane: quanto mais forte você ficar, mais profundo poderá ir… e maiores serão os perigos que encontrará.",
-                -95, 23, 335);
+            panel.sizeDelta = new Vector2(610f, 690f);
+            TMP_Text body = Label("Um bom lugar para começar uma nova vida como mergulhador profissional, não acha?\n\n"
+                + "Dizem que estas águas escondem tesouros e riquezas há muito esquecidos. No fundo do oceano há muito a encontrar, mas chegar até lá nem sempre será fácil.\n\n"
+                + "O que você trouxer do mar pode ajudar este pequeno vilarejo a crescer. Aos poucos, novas pessoas podem chamar a ilha de lar, enquanto você melhora seus equipamentos e ganha experiência como mergulhador.\n\n"
+                + "A vida por aqui pode ser simples, mas talvez seja justamente esse o encanto. Um barco, o oceano à sua frente e a chance de construir uma nova vida na Ilha do Campeche.\n\n"
+                + "Só não esqueça que, conforme você avança, as recompensas aumentam, mas os perigos também.",
+                -85, 20, 520);
+            body.rectTransform.sizeDelta = new Vector2(550f, body.rectTransform.sizeDelta.y);
+            body.alignment = TextAlignmentOptions.Justified;
             gameAudio.StartLetter();
             BeginTypewriter(body);
-            PrepareContinuePrompt(-450);
+            PrepareContinuePrompt(-625);
         }
 
         public static void ShowRescueLetter(bool firstDeathFree, int chargedGold, int configuredCost)
         {
             BoatRecoveryActive = false;
             if (instance == null) return;
-            instance.Freeze(false);
+            // Keep ocean animation and scene music running while gameplay input and
+            // the repaired boat remain blocked for the rescue message/transition.
+            instance.Freeze(false, true);
             instance.showingLetter = true;
+            instance.showingCampaignIntro = false;
             instance.letterFrame = Time.frameCount;
             instance.ClearPanel("DE VOLTA AO ESTALEIRO", EditableUIPanelKind.TutorialPanel);
             bool receivedDiscount = !firstDeathFree && chargedGold < configuredCost;
@@ -426,11 +450,15 @@ namespace GameJamOcean.UI
             canvas.gameObject.SetActive(true);
             ClearPanel(ocean ? "CONTROLES DO BARCO" : "CONTROLES DO MERGULHO",
                 EditableUIPanelKind.TutorialPanel);
+            // Tutorial panels share the same runtime template. Always restore a
+            // content-sized layout here so the larger story panel cannot leak
+            // its dimensions into the controls screen.
+            panel.sizeDelta = ocean ? new Vector2(570f, 490f) : new Vector2(630f, 440f);
             string controls = ocean
                 ? "WASD / Setas — mover e virar\nShift — turbo\nF — interagir\nP — pausar\nBotão direito do mouse — movimentar a câmera"
-                : "WASD / Setas — nadar\nShift — dash\nClique esquerdo / segurar — atacar\nF — interagir\nP — pausar\n\nMuito cuidado com as profundezas do mar. Alguns bichos são mais hostis, outros são mais astutos, mas uma coisa é certa: estamos em perigo o tempo todo.";
-            Label(controls, -105, ocean ? 24 : 21, ocean ? 230 : 285);
-            Button("ENTENDI", -430, () => CloseControlsTutorial(ocean));
+                : "WASD / Setas — nadar\nShift — dash\nClique esquerdo / segurar — atacar\nF — interagir\nP — pausar\n\nAs profundezas do mar guardam muitos desafios. Alguns bichos são mais hostis, outros mais astutos, mas cada mergulho também traz novas descobertas. Mantenha-se atento, explore com coragem e aproveite tudo o que o oceano tem a oferecer.";
+            Label(controls, -105, ocean ? 24 : 21, ocean ? 230 : 240);
+            Button("ENTENDI", ocean ? -405 : -350, () => CloseControlsTutorial(ocean));
         }
 
         private void CloseControlsTutorial(bool ocean)
@@ -449,17 +477,14 @@ namespace GameJamOcean.UI
             if (main)
             {
                 var progress = GameProgress.Instance;
-                bool hasSave = progress != null && progress.HasSavedGame;
-                panel.sizeDelta = new Vector2(panel.sizeDelta.x, hasSave ? 420f : 360f);
+                bool hasCampaign = progress != null && progress.HasValidCampaign;
+                panel.sizeDelta = new Vector2(panel.sizeDelta.x, hasCampaign ? 420f : 360f);
                 MainMenuLogo();
-                Button(hasSave ? "Continuar" : "Iniciar", -145, () =>
-                {
-                    if (hasSave) StartGameplay();
-                    else { PrepareNewGameTutorials(); ShowLetter(); }
-                }, 360f);
-                if (hasSave) Button("Novo jogo", -210, ConfirmNewGame, 360f);
-                Button("Ajustes", hasSave ? -275 : -215, ShowSettings, 360f);
-                Button("Sair", hasSave ? -340 : -280, ConfirmExitGame, 360f);
+                Button(hasCampaign ? "Continuar" : "Novo jogo", -145,
+                    hasCampaign ? ContinueCampaign : ConfirmNewGame, 360f);
+                if (hasCampaign) Button("Novo jogo", -210, ConfirmNewGame, 360f);
+                Button("Ajustes", hasCampaign ? -275 : -215, ShowSettings, 360f);
+                Button("Sair", hasCampaign ? -340 : -280, ConfirmExitGame, 360f);
             }
             else
             {
@@ -471,6 +496,25 @@ namespace GameJamOcean.UI
             }
         }
 
+        private void ContinueCampaign()
+        {
+            GameProgress progress = GameProgress.Instance;
+            if (progress == null || !progress.HasValidCampaign)
+            {
+                ShowHome();
+                return;
+            }
+            if (progress.IsIntroPending)
+            {
+                // Also restores the tutorial route if preferences were removed while
+                // the campaign introduction was still pending.
+                PrepareNewGameTutorials();
+                ShowLetter();
+                return;
+            }
+            StartGameplay();
+        }
+
         private void ConfirmNewGame()
         {
             ClearPanel("NOVO JOGO");
@@ -479,7 +523,9 @@ namespace GameJamOcean.UI
             Button("Iniciar novo jogo", -285, () =>
             {
                 if (!CanLoadOcean()) return;
-                GameProgress.Instance.ResetProgress();
+                // When difficulty selection is added, move this call to the point
+                // immediately after Easy/Normal has been chosen successfully.
+                GameProgress.Instance.BeginNewCampaign();
                 PrepareNewGameTutorials();
                 InteractionDiscoveryStore.ResetAll();
                 DivePointSpawnManager3D.ResetRuntimeState();
@@ -520,6 +566,7 @@ namespace GameJamOcean.UI
         {
             if (loading || !CanLoadOcean()) return;
             FindFirstObjectByType<DiveSessionFlowController>()?.CommitAbandonedSession();
+            FindFirstObjectByType<BoatStats3D>()?.SaveCurrentBoatHealth();
             GameProgress.Instance.SaveProgress();
             OceanReturnState3D.ResetRuntimeState();
             requestMain = toMain;
@@ -544,7 +591,14 @@ namespace GameJamOcean.UI
                 SteeringMultiplier = value;
                 PlayerPrefs.SetFloat(SettingsKey + "Steering", value);
             });
-            Button("Voltar", -450, ShowHome);
+            Button("Voltar", -450, SaveSettingsAndReturnHome);
+        }
+
+        private void SaveSettingsAndReturnHome()
+        {
+            // Preferences have their own persistence lifecycle and never touch GameProgress.
+            PlayerPrefs.Save();
+            ShowHome();
         }
 
         private static void ExitGame()
@@ -704,6 +758,8 @@ namespace GameJamOcean.UI
             if (text == null) return;
             TMP_FontAsset font = role == GameFontRole.Display ? RussoOne : Kanit;
             if (font != null) text.font = font;
+            text.extraPadding = true;
+            text.isTextObjectScaleStatic = true;
         }
 
         public static void ApplyLoadedTexts()
@@ -723,7 +779,9 @@ namespace GameJamOcean.UI
         {
             Font source = Resources.Load<Font>(resourcePath);
             if (source == null) return null;
-            TMP_FontAsset asset = TMP_FontAsset.CreateFontAsset(source);
+            // A denser SDF source keeps small UI labels clean after CanvasScaler reduction.
+            TMP_FontAsset asset = TMP_FontAsset.CreateFontAsset(source, 120, 12,
+                GlyphRenderMode.SDFAA, 1024, 1024, AtlasPopulationMode.Dynamic, true);
             asset.name = assetName;
             return asset;
         }

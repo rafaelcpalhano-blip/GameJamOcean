@@ -50,6 +50,7 @@ namespace GameJamOcean.Boat
         private bool sinking;
         private int activeBoatLevel = 1;
         private bool switchingBoat;
+        private bool healthMemoryInitialized;
 
         public Health Health => health;
         public float HealthPercentage => health != null ? health.NormalizedHealth : 0f;
@@ -81,7 +82,8 @@ namespace GameJamOcean.Boat
         {
             ApplyPurchasedUpgrades();
             if (!OceanReturnState3D.TryRestoreHealth(health)) RestoreSelectedBoatHealth();
-            else SaveActiveBoatHealth(health);
+            healthMemoryInitialized = true;
+            SaveActiveBoatHealth(health);
         }
 
         private void ApplyPurchasedUpgrades()
@@ -92,7 +94,9 @@ namespace GameJamOcean.Boat
             var turbo = progress.Catalog.Find(UpgradeKind.BoatTurbo);
             if (hull == null || turbo == null) return;
             int vesselLevel = progress.GetLevel(UpgradeKind.BoatHull);
-            float ratio = health.NormalizedHealth;
+            bool resetForNewCampaign = progress.IsStartingNewCampaign;
+            if (resetForNewCampaign) activeBoatLevel = progress.SelectedBoatLevel;
+            float ratio = resetForNewCampaign ? 1f : health.NormalizedHealth;
             bool wasSwitching = switchingBoat;
             switchingBoat = true;
             try
@@ -103,7 +107,7 @@ namespace GameJamOcean.Boat
                 health.SetCurrentHealth(health.MaximumHealth * ratio);
             }
             finally { switchingBoat = wasSwitching; }
-            if (!wasSwitching) SaveActiveBoatHealth(health);
+            if (!wasSwitching && healthMemoryInitialized) SaveActiveBoatHealth(health);
         }
 
         private void OnDisable()
@@ -197,6 +201,11 @@ namespace GameJamOcean.Boat
             controller.enabled = true;
         }
 
+        public void SaveCurrentBoatHealth()
+        {
+            SaveActiveBoatHealth(health);
+        }
+
         public bool SelectBoat(int level)
         {
             if (!GameProgress.HasInstance || level == activeBoatLevel
@@ -236,7 +245,8 @@ namespace GameJamOcean.Boat
 
         private void SaveActiveBoatHealth(Health changedHealth)
         {
-            if (!switchingBoat && GameProgress.HasInstance && changedHealth != null)
+            if (healthMemoryInitialized && !switchingBoat
+                && GameProgress.HasInstance && changedHealth != null)
                 GameProgress.Instance.SetSavedBoatHealthState(activeBoatLevel,
                     changedHealth.CurrentHealth, changedHealth.MaximumHealth);
         }
@@ -299,8 +309,8 @@ namespace GameJamOcean.Boat
             if (camera != null) camera.ShowRescueView();
             sinking = false;
             GameJamOcean.UI.GameMenus.ShowRescueLetter(firstDeathFree, chargedGold, destructionGoldCost);
-            // The letter and camera transition pause physics. Keep the exact dock pose
-            // visible until simulation has resumed and has fresh interpolation samples.
+            // The rescue overlay keeps the world flowing but anchors this rigidbody.
+            // Preserve the exact dock pose until it has fresh interpolation samples.
             yield return new WaitForFixedUpdate();
             yield return new WaitForFixedUpdate();
             if (body != null) body.interpolation = previousInterpolation;

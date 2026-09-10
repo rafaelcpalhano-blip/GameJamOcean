@@ -17,6 +17,7 @@ namespace GameJamOcean.UI
         private GameProgress progress;
         private Coroutine flashAnimation;
         private static OceanGoldHUD instance;
+        private int displayedTotal = int.MinValue;
 
         public static void FlashAvailableGold()
         {
@@ -42,7 +43,7 @@ namespace GameJamOcean.UI
             progress.TotalGoldChanged += OnGoldChanged;
             int pending = progress.ConsumePendingGoldDelta();
             if (pending != 0) ShowDelta(pending, progress.TotalGold);
-            else totalLabel.text = progress.TotalGold.ToString();
+            else SetDisplayedTotal(progress.TotalGold);
         }
 
         private IEnumerator FlashGold()
@@ -62,13 +63,18 @@ namespace GameJamOcean.UI
         {
             if (goldSpinDriver != null && goldSpinDriver.sprite != null)
                 coinImage.sprite = goldSpinDriver.sprite;
+
+            // Event updates remain immediate; this inexpensive guard also repairs the HUD
+            // if another system changes or reloads progression without delivering an event.
+            if (progress != null && deltaAnimation == null && displayedTotal != progress.TotalGold)
+                SetDisplayedTotal(progress.TotalGold);
         }
 
         private void OnGoldChanged(int total)
         {
             int delta = progress.ConsumePendingGoldDelta();
             if (delta != 0) ShowDelta(delta, total);
-            else totalLabel.text = total.ToString();
+            else SetDisplayedTotal(total);
         }
 
         private void ShowDelta(int delta, int total)
@@ -79,7 +85,7 @@ namespace GameJamOcean.UI
 
         private IEnumerator AnimateDelta(int delta, int finalTotal)
         {
-            totalLabel.text = Mathf.Max(0, finalTotal - delta).ToString();
+            SetDisplayedTotal(Mathf.Max(0, finalTotal - delta));
             deltaLabel.text = delta > 0 ? $"+{delta}" : delta.ToString();
             deltaLabel.color = delta > 0 ? new Color(.25f, 1f, .35f) : new Color(1f, .25f, .2f);
             RectTransform rect = deltaLabel.rectTransform;
@@ -97,10 +103,16 @@ namespace GameJamOcean.UI
                 if (t > .75f) deltaLabel.alpha = 1f - (t - .75f) / .25f;
                 yield return null;
             }
-            totalLabel.text = finalTotal.ToString();
+            SetDisplayedTotal(finalTotal);
             deltaLabel.text = "";
             rect.localScale = Vector3.one;
             deltaAnimation = null;
+        }
+
+        private void SetDisplayedTotal(int total)
+        {
+            displayedTotal = Mathf.Max(0, total);
+            if (totalLabel != null) totalLabel.text = displayedTotal.ToString();
         }
 
         private void Build()

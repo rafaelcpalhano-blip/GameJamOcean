@@ -6,6 +6,8 @@ namespace GameJamOcean.Interaction
     [DisallowMultipleComponent]
     public sealed class InteractionPromptUI2D : MonoBehaviour
     {
+        public const string DefaultFirstTimeMessage = "Pressione F ou Clique";
+
         [Header("References")]
         [SerializeField] private PlayerInteractor2D playerInteractor;
         [SerializeField] private PlayerInteractor3D playerInteractor3D;
@@ -13,7 +15,7 @@ namespace GameJamOcean.Interaction
         [SerializeField] private TMP_Text promptText;
 
         [Header("Messages")]
-        [SerializeField] private string firstTimeMessage = "Press F or Click";
+        [SerializeField] private string firstTimeMessage = DefaultFirstTimeMessage;
         [SerializeField] private string nearbyMessage = "[ F ]";
         [SerializeField, Min(0.5f)] private float firstTimeDuration = 4f;
 
@@ -27,6 +29,11 @@ namespace GameJamOcean.Interaction
 
         private void Awake()
         {
+            // Migrate prompt components already serialized in older scenes.
+            if (string.IsNullOrWhiteSpace(firstTimeMessage)
+                || firstTimeMessage == "Press F or Click")
+                firstTimeMessage = DefaultFirstTimeMessage;
+
             FindReferencesIfNeeded();
             Hide();
         }
