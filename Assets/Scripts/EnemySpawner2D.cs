@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using GameJamOcean.Diving;
 using GameJamOcean.Enemies;
 using GameJamOcean.Player;
+using GameJamOcean.Progression;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -79,6 +80,7 @@ namespace GameJamOcean.Spawning
         private int initialTarget;
         private bool sessionPrepared;
         private float lastSpawnTime;
+        private float regularSpawnInterval;
 
         [Header("Legacy Simultaneous Limit (without upgrade difficulty)")]
         [SerializeField, Min(1)] private int baseMaximumAlive = 3;
@@ -138,7 +140,7 @@ namespace GameJamOcean.Spawning
             sessionPrepared = true;
             SpawnInitialEnemies();
             lastSpawnTime = Time.time;
-            nextSpawnTime = Time.time + (tier != null ? baseSpawnInterval : initialDelay);
+            nextSpawnTime = Time.time + (tier != null ? regularSpawnInterval : initialDelay);
         }
 
         private void SpawnInitialEnemies()
@@ -172,7 +174,7 @@ namespace GameJamOcean.Spawning
             if (sessionManager.ActiveDifficulty != null)
             {
                 currentSpawnInterval = recentKills.Count >= fastKillThreshold
-                    ? Mathf.Max(0.1f, Mathf.Min(baseSpawnInterval, fastSpawnInterval)) : baseSpawnInterval;
+                    ? Mathf.Max(0.1f, Mathf.Min(regularSpawnInterval, fastSpawnInterval)) : regularSpawnInterval;
                 nextSpawnTime = lastSpawnTime + currentSpawnInterval;
             }
 
@@ -213,7 +215,15 @@ namespace GameJamOcean.Spawning
                 minimumSpawnInterval,
                 baseSpawnInterval - currentDifficulty * intervalReductionPerDifficulty);
             if (sessionManager != null && sessionManager.ActiveDifficulty != null)
-            { currentMaximumAlive = sessionManager.TotalEnemies; currentSpawnInterval = baseSpawnInterval; }
+            {
+                currentMaximumAlive = sessionManager.TotalEnemies;
+                GameDifficulty difficulty = GameProgress.HasInstance
+                    ? GameProgress.Instance.CurrentDifficulty : GameDifficulty.Normal;
+                regularSpawnInterval = GameDifficultyRules
+                    .GetDiveSpawnSettings(difficulty, Mathf.Max(0, currentDifficulty - 1)).SpawnInterval;
+                currentSpawnInterval = regularSpawnInterval;
+            }
+            else regularSpawnInterval = currentSpawnInterval;
 
             RebuildAvailableEnemyList();
         }

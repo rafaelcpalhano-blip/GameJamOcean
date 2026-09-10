@@ -193,7 +193,16 @@ namespace GameJamOcean.Diving
                 for (int i = 0; i < difficultyTiers.Length; i++)
                     thresholds[i] = difficultyTiers[i] != null ? difficultyTiers[i].minimumPurchasedUpgrades : -1;
                 int selected = DiveDifficultyRules.SelectTier(points, thresholds);
-                if (selected >= 0) { ActiveDifficulty = difficultyTiers[selected]; difficultyLevel = selected + 1; }
+                if (selected >= 0)
+                {
+                    DiveDifficultyTier normalTier = difficultyTiers[selected];
+                    GameDifficulty gameDifficulty = GameProgress.HasInstance
+                        ? GameProgress.Instance.CurrentDifficulty : GameDifficulty.Normal;
+                    DiveSpawnSettings spawn = GameDifficultyRules.GetDiveSpawnSettings(gameDifficulty, selected);
+                    ActiveDifficulty = new DiveDifficultyTier(normalTier.minimumPurchasedUpgrades,
+                        spawn.InitialEnemies, spawn.TotalEnemies, normalTier.enemyWeights);
+                    difficultyLevel = selected + 1;
+                }
                 if (ActiveDifficulty != null) totalEnemies = Mathf.Max(1, ActiveDifficulty.totalEnemies);
             }
             UnsubscribeFromAllEnemies();

@@ -4,6 +4,53 @@ using UnityEngine.Events;
 
 namespace GameJamOcean.Progression
 {
+    public enum GameDifficulty
+    {
+        Normal = 0,
+        Easy = 1,
+        Hard = 2
+    }
+
+    public readonly struct DiveSpawnSettings
+    {
+        public readonly int InitialEnemies;
+        public readonly int TotalEnemies;
+        public readonly float SpawnInterval;
+
+        public DiveSpawnSettings(int initialEnemies, int totalEnemies, float spawnInterval)
+        {
+            InitialEnemies = initialEnemies;
+            TotalEnemies = totalEnemies;
+            SpawnInterval = spawnInterval;
+        }
+    }
+
+    public static class GameDifficultyRules
+    {
+        private static readonly int[] NormalInitial = { 6, 12, 14, 15, 16 };
+        private static readonly int[] NormalTotal = { 18, 30, 33, 38, 45 };
+        private static readonly int[] EasyInitial = { 5, 8, 10, 11, 12 };
+        private static readonly int[] EasyTotal = { 15, 22, 24, 28, 35 };
+        private static readonly int[] HardInitial = { 9, 15, 17, 19, 21 };
+        private static readonly int[] HardTotal = { 25, 35, 45, 51, 58 };
+
+        public static DiveSpawnSettings GetDiveSpawnSettings(GameDifficulty difficulty, int tierIndex)
+        {
+            int index = Mathf.Clamp(tierIndex, 0, NormalInitial.Length - 1);
+            if (difficulty == GameDifficulty.Easy)
+                return new DiveSpawnSettings(EasyInitial[index], EasyTotal[index], 3f);
+            if (difficulty == GameDifficulty.Hard)
+                return new DiveSpawnSettings(HardInitial[index], HardTotal[index], 2.5f);
+            return new DiveSpawnSettings(
+                NormalInitial[index], NormalTotal[index], 2f);
+        }
+
+        public static int GetBoatDestructionCost(GameDifficulty difficulty, int normalCost)
+        {
+            return difficulty == GameDifficulty.Easy ? 125 : Mathf.Max(0, normalCost);
+        }
+    }
+
     [DisallowMultipleComponent]
     public sealed class GameProgress : MonoBehaviour
     {
@@ -15,6 +62,7 @@ namespace GameJamOcean.Progression
         [SerializeField, Range(1, 3)] private int selectedBoatLevel = 1;
         [SerializeField] private float[] savedBoatHealth = { -1f, -1f, -1f };
         [SerializeField] private float[] savedBoatMaximumHealth = { -1f, -1f, -1f };
+        [SerializeField] private GameDifficulty currentDifficulty = GameDifficulty.Normal;
         [SerializeField] private UnityEvent onGameCompleted = new();
         private const string SaveKey = "GameJamOcean.Progress.v1";
         private const int CurrentSaveVersion = 2;
@@ -36,6 +84,7 @@ namespace GameJamOcean.Progression
             public int selectedBoat;
             public float[] boatHealth;
             public float[] boatMaximumHealth;
+            public GameDifficulty difficulty;
         }
 
         [Header("Events")]
@@ -57,6 +106,7 @@ namespace GameJamOcean.Progression
         public UpgradeCatalog Catalog => upgradeCatalog;
 
         public int TotalGold => totalGold;
+        public GameDifficulty CurrentDifficulty => currentDifficulty;
         public int SelectedBoatLevel => Mathf.Clamp(selectedBoatLevel, 1,
             Mathf.Clamp(GetLevel(UpgradeKind.BoatHull), 1, 3));
         public int ConsumePendingGoldDelta()
@@ -121,9 +171,11 @@ namespace GameJamOcean.Progression
             return true;
         }
 
-        public void BeginNewCampaign()
+        public void BeginNewCampaign(GameDifficulty difficulty)
         {
             SetDefaultProgress();
+            currentDifficulty = Enum.IsDefined(typeof(GameDifficulty), difficulty)
+                ? difficulty : GameDifficulty.Normal;
             HasValidCampaign = true;
             introCompleted = false;
             GameJamOcean.Boat.OceanReturnState3D.ResetRuntimeState();
@@ -141,6 +193,8 @@ namespace GameJamOcean.Progression
             onTotalGoldChanged?.Invoke(totalGold);
             TotalGoldChanged?.Invoke(totalGold);
         }
+
+        public void BeginNewCampaign() => BeginNewCampaign(GameDifficulty.Normal);
 
         public void MarkIntroCompleted()
         {
@@ -280,7 +334,7 @@ namespace GameJamOcean.Progression
                     introCompleted = introCompleted, gold = totalGold,
                     levels = upgradeLevels, boatDeaths = boatDestructions,
                     selectedBoat = selectedBoatLevel, boatHealth = savedBoatHealth,
-                    boatMaximumHealth = savedBoatMaximumHealth }));
+                    boatMaximumHealth = savedBoatMaximumHealth, difficulty = currentDifficulty }));
             PlayerPrefs.Save();
         }
 
@@ -305,6 +359,8 @@ namespace GameJamOcean.Progression
                 selectedBoatLevel = Mathf.Clamp(saved.selectedBoat <= 0 ? 1 : saved.selectedBoat, 1, 3);
                 savedBoatHealth = saved.boatHealth;
                 savedBoatMaximumHealth = saved.boatMaximumHealth;
+                currentDifficulty = Enum.IsDefined(typeof(GameDifficulty), saved.difficulty)
+                    ? saved.difficulty : GameDifficulty.Normal;
                 EnsureBoatData();
                 if (saved.levels != null) for (int i = 0; i < Math.Min(6, saved.levels.Length); i++)
                     upgradeLevels[i] = Mathf.Clamp(saved.levels[i], i == 0 ? 0 : 1,
@@ -327,6 +383,7 @@ namespace GameJamOcean.Progression
             selectedBoatLevel = 1;
             savedBoatHealth = new[] { -1f, -1f, -1f };
             savedBoatMaximumHealth = new[] { -1f, -1f, -1f };
+            currentDifficulty = GameDifficulty.Normal;
         }
 
         private static bool IsValidLegacyCampaign(SaveData saved)

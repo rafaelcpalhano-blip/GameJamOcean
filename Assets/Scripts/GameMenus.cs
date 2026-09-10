@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using GameJamOcean.Boat;
 using GameJamOcean.Flow;
 using GameJamOcean.Interaction;
+using GameJamOcean.Localization;
 using GameJamOcean.Progression;
 using GameJamOcean.Spawning;
 using TMPro;
@@ -523,16 +524,32 @@ namespace GameJamOcean.UI
             Button("Iniciar novo jogo", -285, () =>
             {
                 if (!CanLoadOcean()) return;
-                // When difficulty selection is added, move this call to the point
-                // immediately after Easy/Normal has been chosen successfully.
-                GameProgress.Instance.BeginNewCampaign();
-                PrepareNewGameTutorials();
-                InteractionDiscoveryStore.ResetAll();
-                DivePointSpawnManager3D.ResetRuntimeState();
-                requestIntro = true;
-                Travel(false);
+                ShowDifficultySelection();
             });
             Button("Cancelar", -355, ShowHome);
+        }
+
+        private void ShowDifficultySelection()
+        {
+            ClearPanel(GameLocalization.Get("difficulty.title"));
+            panel.sizeDelta = new Vector2(panel.sizeDelta.x, 430f);
+            Button(GameLocalization.Get("difficulty.easy"), -145,
+                () => StartNewCampaign(GameDifficulty.Easy), 360f);
+            Button(GameLocalization.Get("difficulty.normal"), -215,
+                () => StartNewCampaign(GameDifficulty.Normal), 360f);
+            Button(GameLocalization.Get("difficulty.hard"), -285,
+                () => StartNewCampaign(GameDifficulty.Hard), 360f);
+        }
+
+        private void StartNewCampaign(GameDifficulty difficulty)
+        {
+            if (!CanLoadOcean() || GameProgress.Instance == null) return;
+            GameProgress.Instance.BeginNewCampaign(difficulty);
+            PrepareNewGameTutorials();
+            InteractionDiscoveryStore.ResetAll();
+            DivePointSpawnManager3D.ResetRuntimeState();
+            requestIntro = true;
+            Travel(false);
         }
 
         private void ConfirmTravel(bool toMain)
@@ -796,6 +813,59 @@ namespace GameJamOcean.UI
                 || key.Contains("TOTAL") || key.Contains("PROGRESS") || key.Contains("REWARD")
                 || key.Contains("UPGRADE NAME") || content.Contains("MERGULHO CONCLUÍDO")
                 || content.Trim() == "100%";
+        }
+    }
+}
+
+namespace GameJamOcean.Localization
+{
+    public enum GameLanguage
+    {
+        PortugueseBrazil,
+        English
+    }
+
+    public static class GameLocalization
+    {
+        private const string LanguageKey = "GameJamOcean.Settings.Language";
+        private static readonly Dictionary<string, string> Portuguese = new()
+        {
+            ["difficulty.title"] = "Escolha a dificuldade",
+            ["difficulty.easy"] = "Fácil",
+            ["difficulty.normal"] = "Normal",
+            ["difficulty.hard"] = "Difícil"
+        };
+        private static readonly Dictionary<string, string> English = new()
+        {
+            ["difficulty.title"] = "Choose Difficulty",
+            ["difficulty.easy"] = "Easy",
+            ["difficulty.normal"] = "Normal",
+            ["difficulty.hard"] = "Hard"
+        };
+
+        public static GameLanguage CurrentLanguage
+        {
+            get
+            {
+                string saved = PlayerPrefs.GetString(LanguageKey, "pt-BR");
+                return saved.Equals("en", StringComparison.OrdinalIgnoreCase)
+                    || saved.StartsWith("en-", StringComparison.OrdinalIgnoreCase)
+                    ? GameLanguage.English
+                    : GameLanguage.PortugueseBrazil;
+            }
+        }
+
+        public static string Get(string key)
+        {
+            Dictionary<string, string> table = CurrentLanguage == GameLanguage.English ? English : Portuguese;
+            return table.TryGetValue(key, out string value) ? value : key;
+        }
+
+        public static void SetLanguage(GameLanguage language)
+        {
+            PlayerPrefs.SetString(LanguageKey,
+                language == GameLanguage.English ? "en" : "pt-BR");
+            PlayerPrefs.Save();
         }
     }
 }

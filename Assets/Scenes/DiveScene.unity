@@ -420,7 +420,7 @@ MonoBehaviour:
     - 15
   - minimumPurchasedUpgrades: 9
     initialEnemies: 15
-    totalEnemies: 37
+    totalEnemies: 38
     enemyWeights:
     - 10
     - 25
@@ -429,7 +429,7 @@ MonoBehaviour:
     - 25
   - minimumPurchasedUpgrades: 12
     initialEnemies: 16
-    totalEnemies: 42
+    totalEnemies: 45
     enemyWeights:
     - 15
     - 15

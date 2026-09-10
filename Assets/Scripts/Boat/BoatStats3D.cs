@@ -266,8 +266,14 @@ namespace GameJamOcean.Boat
             GameJamOcean.UI.GameMenus.BoatRecoveryActive = true;
             bool firstDeathFree = true;
             int chargedGold = 0;
+            int applicableDestructionCost = destructionGoldCost;
             if (GameProgress.HasInstance)
-                GameProgress.Instance.RegisterBoatDestruction(destructionGoldCost, out firstDeathFree, out chargedGold);
+            {
+                applicableDestructionCost = GameDifficultyRules.GetBoatDestructionCost(
+                    GameProgress.Instance.CurrentDifficulty, destructionGoldCost);
+                GameProgress.Instance.RegisterBoatDestruction(applicableDestructionCost,
+                    out firstDeathFree, out chargedGold);
+            }
             var body = GetComponent<Rigidbody>();
             bool wasKinematic = body.isKinematic;
             // Do not interpolate from underwater poses across the rescue teleport/pause.
@@ -308,7 +314,7 @@ namespace GameJamOcean.Boat
             var camera = FindFirstObjectByType<GameJamOcean.CameraSystem.CameraFollow3D>();
             if (camera != null) camera.ShowRescueView();
             sinking = false;
-            GameJamOcean.UI.GameMenus.ShowRescueLetter(firstDeathFree, chargedGold, destructionGoldCost);
+            GameJamOcean.UI.GameMenus.ShowRescueLetter(firstDeathFree, chargedGold, applicableDestructionCost);
             // The rescue overlay keeps the world flowing but anchors this rigidbody.
             // Preserve the exact dock pose until it has fresh interpolation samples.
             yield return new WaitForFixedUpdate();

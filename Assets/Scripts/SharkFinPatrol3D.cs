@@ -4,6 +4,7 @@ using UnityEngine.SceneManagement;
 using GameJamOcean.Audio;
 using GameJamOcean.Boat;
 using GameJamOcean.Combat;
+using GameJamOcean.Progression;
 
 namespace GameJamOcean.World
 {
@@ -61,7 +62,12 @@ namespace GameJamOcean.World
             foreach (var root in scene.GetRootGameObjects())
             foreach (var t in root.GetComponentsInChildren<Transform>(true))
             {
-                if (!IsFin(t.name) || t.GetComponentInParent<SharkFinPatrol3D>() != null) continue;
+                if (!IsFin(t.name)) continue;
+                bool removedInEasy = t.name.TrimEnd().EndsWith("removed", System.StringComparison.OrdinalIgnoreCase);
+                bool shouldBeActive = !removedInEasy || !GameProgress.HasInstance
+                    || GameProgress.Instance.CurrentDifficulty != GameDifficulty.Easy;
+                t.gameObject.SetActive(shouldBeActive);
+                if (!shouldBeActive || t.GetComponentInParent<SharkFinPatrol3D>() != null) continue;
                 t.gameObject.AddComponent<SharkFinPatrol3D>();
             }
         }
