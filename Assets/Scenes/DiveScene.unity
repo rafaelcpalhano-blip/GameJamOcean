@@ -4761,6 +4761,10 @@ MonoBehaviour:
   powerUpDetectionRadius: 0.75
   hitImmunitySeconds: 1.5
   hitBlinks: 3
+  hitTintColor: {r: 1, g: 0.02, b: 0.02, a: 1}
+  hitTintStrength: 1
+  hitBlinkMinimumAlpha: 0.35
+  hitTintShader: {fileID: 4800000, guid: 5a9c1e4568fc4ab6a8f3b2487db53201, type: 3}
   damageSound: {fileID: 8300000, guid: e1cbe4dbceca15149ab6269607a9c7f6, type: 3}
   damageSoundVolume: 0.5
   dashCooldown: 5
@@ -4866,6 +4870,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 512
   baseProjectileCount: 1
+  level4FlightSpeedMultiplier: 0.8
 --- !u!114 &1745452239
 MonoBehaviour:
   m_ObjectHideFlags: 0

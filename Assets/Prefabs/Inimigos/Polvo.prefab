@@ -234,7 +234,7 @@ MonoBehaviour:
   isolationEnemyCount: 5
   attackType: 0
   attackRange: 0.8
-  attackDamage: 2
+  attackDamage: 1
   attackCooldown: 1.25
   onAttack:
     m_PersistentCalls:

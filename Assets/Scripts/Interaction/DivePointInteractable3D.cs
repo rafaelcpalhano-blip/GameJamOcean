@@ -11,7 +11,6 @@ namespace GameJamOcean.Interaction
     [RequireComponent(typeof(Collider))]
     public sealed class DivePointInteractable3D : MonoBehaviour, IInteractable
     {
-        [SerializeField] private string prompt = "Entrar na fase de mergulho";
         [SerializeField] private string sceneName = "DiveScene";
         [SerializeField] private bool available = true;
 

@@ -11,11 +11,9 @@ namespace GameJamOcean.CameraSystem
     public sealed class CameraFollow3D : MonoBehaviour
     {
         [SerializeField] private Transform target;
-        [SerializeField] private Vector3 offset = new(0f, 12f, -10f);
-        [SerializeField] private Vector3 lookAtOffset = new(0f, 0.5f, 0f);
-        [SerializeField, Min(0f)] private float smoothTime = 0.5f;
-        [SerializeField, Min(0f)] private float maximumSpeed = 40f;
-        [SerializeField, Min(0f)] private float rotationSharpness = 3f;
+        [SerializeField] private Vector3 offset = new(0f, 10.7f, -11.38f);
+        [SerializeField] private Vector3 lookAtOffset = new(0f, 4f, 0f);
+        [SerializeField, Min(0f)] private float rotationSharpness = 6f;
         [SerializeField] private bool snapOnEnable = true;
 
         [Header("Main Menu View (World Space)")]
@@ -144,8 +142,8 @@ namespace GameJamOcean.CameraSystem
                 basePosition = endPosition;
                 baseRotation = endRotation;
                 heading = target.eulerAngles.y;
-                followVelocity = Vector3.zero;
-                headingVelocity = desiredOrbitYaw = orbitYaw = orbitVelocity = 0f;
+                headingVelocity = desiredOrbitYaw = orbitYaw = orbitVelocity = orbitRoll = 0f;
+                recenterTargetChosen = true;
                 desiredLookElevation = lookElevation = elevationVelocity = 0f;
                 draggingOrbit = false;
                 transform.SetPositionAndRotation(basePosition, baseRotation);
@@ -169,19 +167,25 @@ namespace GameJamOcean.CameraSystem
 
         [Header("Follow Heading")]
         [SerializeField] private bool followTargetYaw = true;
-        [SerializeField, Min(0.01f)] private float headingSmoothTime = 1.1f;
-        [SerializeField, Min(1f)] private float maximumHeadingSpeed = 45f;
+        [SerializeField, Min(0.01f)] private float headingSmoothTime = 0.75f;
+        [SerializeField, Min(1f)] private float maximumHeadingSpeed = 75f;
 
         [Header("Right Mouse Orbit (Boat)")]
         [SerializeField] private bool enableMouseOrbit = true;
         [Tooltip("Degrees per pixel of horizontal mouse movement.")]
-        [SerializeField, Range(0.01f, 0.5f)] private float mouseOrbitSensitivity = 0.12f;
-        [SerializeField, Range(10f, 180f)] private float maximumOrbitAngle = 180f;
-        [SerializeField, Min(0.01f)] private float orbitSmoothTime = 0.3f;
-        [SerializeField, Min(0.01f)] private float orbitReturnTime = 1.5f;
-        [SerializeField, Min(0f)] private float orbitReturnDelay = 1.5f;
+        [SerializeField, Range(0.01f, 0.5f)] private float mouseOrbitSensitivity = 0.05f;
+        [SerializeField, Min(0.01f)] private float orbitSmoothTime = 0.2f;
+        [Tooltip("Smooth braking time after the mouse button is released, before automatic recentering begins.")]
+        [SerializeField, Min(0.01f)] private float orbitReleaseSmoothTime = 0.3f;
+        [SerializeField, Min(0.01f)] private float orbitReturnTime = 2.5f;
+        [SerializeField, Min(0f)] private float orbitReturnDelay = 0.2f;
+        [Tooltip("Very small panoramic bank toward the direction of camera rotation.")]
+        [SerializeField, Range(0f, 3f)] private float maximumOrbitRoll = 0.8f;
+        [SerializeField, Min(0.1f)] private float orbitRollSharpness = 5f;
 
         [Header("Mouse Wheel Zoom")]
+        [Tooltip("Keeps the camera on a constant-radius orbit around the boat center and disables wheel zoom.")]
+        [SerializeField] private bool lockOrbitDistance = true;
         [SerializeField, Min(.1f)] private float minimumZoomDistance = 10f;
         [SerializeField, Min(.1f)] private float maximumZoomDistance = 20f;
         [SerializeField, Min(.001f)] private float zoomSensitivity = .012f;
@@ -198,9 +202,11 @@ namespace GameJamOcean.CameraSystem
         private float desiredOrbitYaw;
         private float orbitYaw;
         private float orbitVelocity;
+        private float orbitRoll;
         private float zoomDistance;
         private float orbitReleasedAt = float.NegativeInfinity;
         private bool draggingOrbit;
+        private bool recenterTargetChosen = true;
         private bool applicationFocused = true;
 
         [Header("Subtle Water Motion")]
@@ -227,7 +233,6 @@ namespace GameJamOcean.CameraSystem
         private bool turboShakeRequested;
         private float turboShakeWeight;
 
-        private Vector3 followVelocity;
         private Vector3 basePosition;
         private Quaternion baseRotation;
         private float heading;
@@ -237,8 +242,7 @@ namespace GameJamOcean.CameraSystem
         {
             viewCamera = GetComponent<Camera>();
             desiredLookElevation = lookElevation = elevationVelocity = 0f;
-            followVelocity = Vector3.zero;
-            desiredOrbitYaw = orbitYaw = orbitVelocity = 0f;
+            desiredOrbitYaw = orbitYaw = orbitVelocity = orbitRoll = 0f;
             zoomDistance = Mathf.Clamp(offset.magnitude, minimumZoomDistance, maximumZoomDistance);
             draggingOrbit = false;
             applicationFocused = Application.isFocused;
@@ -274,14 +278,10 @@ namespace GameJamOcean.CameraSystem
             heading = Mathf.SmoothDampAngle(
                 heading, target.eulerAngles.y, ref headingVelocity,
                 headingSmoothTime, maximumHeadingSpeed, Time.deltaTime);
-            basePosition = Vector3.SmoothDamp(
-                basePosition,
-                target.position + GetRotatedOffset(),
-                ref followVelocity,
-                smoothTime,
-                maximumSpeed,
-                Time.deltaTime);
-            LookAtTarget(false);
+            // The camera is mounted on the boat's central orbit: its radius never
+            // changes while navigating, even as the boat or camera rotates.
+            basePosition = target.position + GetRotatedOffset();
+            LookAtTarget(lockOrbitDistance);
             // Apply motion after smoothing, never feed it back into the follow state.
             float intensity = enableWaterMotion ? waterMotionIntensity : 0f;
             float wave = Mathf.Sin(Time.time * motionFrequency * Mathf.PI * 2f);
@@ -307,10 +307,14 @@ namespace GameJamOcean.CameraSystem
             float turboVertical = Mathf.Sin(turboPhase * 1.37f + 1.1f) * turboShakeWeight;
             Vector3 turboOffset = (baseRotation * Vector3.right * turboHorizontal
                 + baseRotation * Vector3.up * turboVertical) * turboShakeDistance;
-            transform.SetPositionAndRotation(
-                basePosition + Vector3.up * (wave * bobHeight * intensity) + impactOffset + turboOffset,
-                baseRotation * Quaternion.Euler(wave * pitchDegrees * intensity - appliedElevation,
-                    0f, shake * impactRollDegrees + turboHorizontal * turboShakeRollDegrees));
+            Vector3 feedbackPosition = lockOrbitDistance ? Vector3.zero
+                : Vector3.up * (wave * bobHeight * intensity) + impactOffset + turboOffset;
+            float feedbackPitch = lockOrbitDistance ? 0f : wave * pitchDegrees * intensity;
+            float feedbackRoll = lockOrbitDistance ? 0f
+                : shake * impactRollDegrees + turboHorizontal * turboShakeRollDegrees;
+            transform.SetPositionAndRotation(basePosition + feedbackPosition,
+                baseRotation * Quaternion.Euler(feedbackPitch - appliedElevation,
+                    0f, orbitRoll + feedbackRoll));
         }
 
         public void SetTurboMicroshake(bool active)
@@ -330,9 +334,9 @@ namespace GameJamOcean.CameraSystem
         {
             if (target == null) return;
             heading = target.eulerAngles.y;
-            headingVelocity = desiredOrbitYaw = orbitYaw = orbitVelocity = 0f;
+            headingVelocity = desiredOrbitYaw = orbitYaw = orbitVelocity = orbitRoll = 0f;
+            recenterTargetChosen = true;
             desiredLookElevation = lookElevation = elevationVelocity = 0f;
-            followVelocity = Vector3.zero;
             basePosition = target.position + GetRotatedOffset();
             LookAtTarget(true);
             transform.SetPositionAndRotation(basePosition, baseRotation);
@@ -346,6 +350,7 @@ namespace GameJamOcean.CameraSystem
 
         private Vector3 GetZoomedOffset()
         {
+            if (lockOrbitDistance) return offset;
             return offset.sqrMagnitude > .001f ? offset.normalized * zoomDistance : offset;
         }
 
@@ -356,7 +361,7 @@ namespace GameJamOcean.CameraSystem
                 && mouse != null && target.GetComponent<BoatController3D>() != null;
             bool wasDragging = draggingOrbit;
             bool pointerOverUi = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
-            if (canOrbit && !pointerOverUi)
+            if (canOrbit && !pointerOverUi && !lockOrbitDistance)
             {
                 float scroll = mouse.scroll.ReadValue().y;
                 if (Mathf.Abs(scroll) > .01f)
@@ -377,6 +382,7 @@ namespace GameJamOcean.CameraSystem
                 {
                     desiredOrbitYaw = orbitYaw;
                     desiredLookElevation = lookElevation;
+                    recenterTargetChosen = false;
                 }
             }
 
@@ -385,9 +391,7 @@ namespace GameJamOcean.CameraSystem
                 if (!mouse.rightButton.wasPressedThisFrame)
                 {
                     // Mouse delta already represents this frame's displacement, not a speed.
-                    desiredOrbitYaw = Mathf.Clamp(desiredOrbitYaw
-                        + mouse.delta.ReadValue().x * mouseOrbitSensitivity,
-                        -maximumOrbitAngle, maximumOrbitAngle);
+                    desiredOrbitYaw += mouse.delta.ReadValue().x * mouseOrbitSensitivity;
                     desiredLookElevation = Mathf.Clamp(desiredLookElevation
                         + mouse.delta.ReadValue().y * verticalLookSensitivity,
                         -maximumLookDown, maximumLookUp);
@@ -395,26 +399,53 @@ namespace GameJamOcean.CameraSystem
             }
             else
             {
-                if (wasDragging) orbitReleasedAt = Time.time;
-                if (Time.time - orbitReleasedAt >= orbitReturnDelay)
+                if (wasDragging)
                 {
-                    desiredOrbitYaw = 0f;
+                    orbitReleasedAt = Time.time;
+                    recenterTargetChosen = false;
+                }
+                if (!recenterTargetChosen && Time.time - orbitReleasedAt >= orbitReturnDelay)
+                {
+                    // Zero degrees has an equivalent behind-the-boat angle every
+                    // full revolution. Choose the nearest one, never unwind turns.
+                    desiredOrbitYaw = orbitYaw + Mathf.DeltaAngle(orbitYaw, 0f);
                     desiredLookElevation = 0f;
+                    recenterTargetChosen = true;
                 }
             }
 
+            bool waitingToRecenter = !draggingOrbit
+                && !recenterTargetChosen;
+            float yawSmoothTime = draggingOrbit ? orbitSmoothTime
+                : waitingToRecenter ? orbitReleaseSmoothTime : orbitReturnTime;
             orbitYaw = Mathf.SmoothDamp(orbitYaw, desiredOrbitYaw, ref orbitVelocity,
-                draggingOrbit ? orbitSmoothTime : orbitReturnTime,
+                yawSmoothTime,
                 Mathf.Infinity, Time.deltaTime);
             lookElevation = Mathf.SmoothDamp(lookElevation, desiredLookElevation, ref elevationVelocity,
-                draggingOrbit ? orbitSmoothTime : orbitReturnTime,
+                yawSmoothTime,
                 Mathf.Infinity, Time.deltaTime);
+            float desiredRoll = Mathf.Clamp(-orbitVelocity * .015f,
+                -maximumOrbitRoll, maximumOrbitRoll);
+            orbitRoll = Mathf.Lerp(orbitRoll, desiredRoll,
+                1f - Mathf.Exp(-orbitRollSharpness * Time.deltaTime));
+            if (!draggingOrbit && recenterTargetChosen
+                && Mathf.Abs(Mathf.DeltaAngle(orbitYaw, 0f)) < .01f
+                && Mathf.Abs(orbitVelocity) < .01f)
+            {
+                // Keep long play sessions numerically stable after multiple turns.
+                desiredOrbitYaw = orbitYaw = orbitVelocity = 0f;
+            }
         }
 
         private void OnApplicationFocus(bool focused)
         {
             applicationFocused = focused;
-            if (!focused) draggingOrbit = false;
+            if (!focused && draggingOrbit)
+            {
+                draggingOrbit = false;
+                orbitReleasedAt = Time.time;
+                recenterTargetChosen = false;
+            }
         }
 
         private void OnDisable()
@@ -424,15 +455,23 @@ namespace GameJamOcean.CameraSystem
             draggingOrbit = false;
             desiredOrbitYaw = 0f;
             orbitReleasedAt = float.NegativeInfinity;
-            desiredLookElevation = lookElevation = elevationVelocity = 0f;
+            recenterTargetChosen = true;
+            desiredLookElevation = lookElevation = elevationVelocity = orbitRoll = 0f;
         }
 
         public void ConfigureRelaxedFollow()
         {
-            smoothTime = 0.5f;
-            rotationSharpness = 3f;
-            headingSmoothTime = 1.1f;
-            maximumHeadingSpeed = 45f;
+            rotationSharpness = 6f;
+            headingSmoothTime = 0.75f;
+            maximumHeadingSpeed = 75f;
+            mouseOrbitSensitivity = 0.05f;
+            orbitSmoothTime = 0.2f;
+            orbitReleaseSmoothTime = 0.3f;
+            orbitReturnTime = 2.5f;
+            orbitReturnDelay = 0.2f;
+            maximumOrbitRoll = 0.8f;
+            orbitRollSharpness = 5f;
+            lockOrbitDistance = true;
         }
 
         public void ConfigureHeadingFollow(Transform followTarget)

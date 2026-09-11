@@ -10268,11 +10268,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameJamOcean.CameraSystem.CameraFollow3D
   target: {fileID: 1699770395}
-  offset: {x: 0, y: 12, z: -10}
+  offset: {x: 0, y: 10.7, z: -11.38}
   lookAtOffset: {x: 0, y: 4, z: 0}
-  smoothTime: 0.5
-  maximumSpeed: 40
-  rotationSharpness: 3
+  rotationSharpness: 6
   snapOnEnable: 1
   menuViewPoint: {fileID: 0}
   menuPosition: {x: 31.382006, y: 16.216637, z: -126.173935}
@@ -10282,14 +10280,17 @@ MonoBehaviour:
   endGameOrbitDegreesPerSecond: 8
   endGameOrbitAcceleration: 3
   followTargetYaw: 1
-  headingSmoothTime: 1.1
-  maximumHeadingSpeed: 45
+  headingSmoothTime: 0.75
+  maximumHeadingSpeed: 75
   enableMouseOrbit: 1
-  mouseOrbitSensitivity: 0.12
-  maximumOrbitAngle: 180
-  orbitSmoothTime: 0.3
-  orbitReturnTime: 1.5
-  orbitReturnDelay: 1.5
+  mouseOrbitSensitivity: 0.05
+  orbitSmoothTime: 0.2
+  orbitReleaseSmoothTime: 0.3
+  orbitReturnTime: 2.5
+  orbitReturnDelay: 0.2
+  maximumOrbitRoll: 0.8
+  orbitRollSharpness: 5
+  lockOrbitDistance: 1
   minimumZoomDistance: 10
   maximumZoomDistance: 20
   zoomSensitivity: 0.012

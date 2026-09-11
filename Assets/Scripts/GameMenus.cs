@@ -317,9 +317,9 @@ namespace GameJamOcean.UI
             TMP_Text body = Label(L("story.new_life.body"), -85, 20, 520);
             body.rectTransform.sizeDelta = new Vector2(550f, body.rectTransform.sizeDelta.y);
             body.alignment = TextAlignmentOptions.Justified;
-            gameAudio.StartLetter();
-            BeginTypewriter(body);
-            PrepareContinuePrompt(-625);
+            gameAudio.StartCampaignIntro(LocalizationManager.CurrentLanguage);
+            BeginTypewriter(body, 35f);
+            PrepareContinuePrompt();
         }
 
         public static void ShowRescueLetter(bool firstDeathFree, int chargedGold, int configuredCost)
@@ -333,6 +333,9 @@ namespace GameJamOcean.UI
             instance.showingCampaignIntro = false;
             instance.letterFrame = Time.frameCount;
             instance.ClearPanel(L("rescue.title"), EditableUIPanelKind.TutorialPanel);
+            // Tutorial panels are reused. Always restore the rescue layout so a
+            // previously enlarged story/tutorial panel cannot leak its size here.
+            instance.panel.sizeDelta = new Vector2(570f, 520f);
             bool receivedDiscount = !firstDeathFree && chargedGold < configuredCost;
             string message = firstDeathFree
                 ? L("rescue.first_free")
@@ -341,29 +344,31 @@ namespace GameJamOcean.UI
                     : L("rescue.charged", L(RescueMessageKeys[UnityEngine.Random.Range(0, RescueMessageKeys.Length)]), configuredCost, chargedGold);
             TMP_Text body = instance.Label(message, -130, 26, 260);
             body.rectTransform.sizeDelta = new Vector2(480f, body.rectTransform.sizeDelta.y);
-            instance.gameAudio.StartLetter();
-            instance.BeginTypewriter(body);
-            instance.PrepareContinuePrompt(-450);
+            if (firstDeathFree)
+                instance.gameAudio.StartFirstBoatRepair(LocalizationManager.CurrentLanguage);
+            else
+                instance.gameAudio.StartLetter();
+            instance.BeginTypewriter(body, 70f);
+            instance.PrepareContinuePrompt();
         }
 
-        private void BeginTypewriter(TMP_Text text)
+        private void BeginTypewriter(TMP_Text text, float charactersPerSecond = 70f)
         {
             StopTypewriter();
-            typewriter = StartCoroutine(TypeLetter(text));
+            typewriter = StartCoroutine(TypeLetter(text, charactersPerSecond));
         }
 
-        private IEnumerator TypeLetter(TMP_Text text)
+        private IEnumerator TypeLetter(TMP_Text text, float charactersPerSecond)
         {
             text.maxVisibleCharacters = 0;
             text.ForceMeshUpdate();
             int total = text.textInfo.characterCount;
             if (gameAudio.PanelOpenDuration > 0f)
                 yield return new WaitForSecondsRealtime(gameAudio.PanelOpenDuration);
-            const float charactersPerSecond = 70f;
             float visible = 0f;
             while (text != null && text.maxVisibleCharacters < total)
             {
-                visible += charactersPerSecond * Time.unscaledDeltaTime;
+                visible += Mathf.Max(1f, charactersPerSecond) * Time.unscaledDeltaTime;
                 text.maxVisibleCharacters = Mathf.Min(total, Mathf.FloorToInt(visible));
                 yield return null;
             }
@@ -371,9 +376,15 @@ namespace GameJamOcean.UI
             ShowContinuePrompt();
         }
 
-        private void PrepareContinuePrompt(float y)
+        private void PrepareContinuePrompt()
         {
-            continuePrompt = Label(L("tutorial.continue_prompt"), y, 18);
+            continuePrompt = Label(L("tutorial.continue_prompt"), 0f, 18);
+            RectTransform promptRect = continuePrompt.rectTransform;
+            promptRect.anchorMin = promptRect.anchorMax = new Vector2(.5f, 0f);
+            promptRect.pivot = new Vector2(.5f, 0f);
+            promptRect.anchoredPosition = new Vector2(0f, 24f);
+            promptRect.sizeDelta = new Vector2(
+                Mathf.Max(200f, panel.rect.width - 50f), 45f);
             continuePrompt.gameObject.SetActive(false);
         }
 

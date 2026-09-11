@@ -8,15 +8,20 @@ namespace GameJamOcean.World
     {
         private static readonly Vector3 FixedLocalOrigin = new(.003f, 5.335f, .006f);
         [Header("Beacon")]
-        [SerializeField] private Color lightColor = new(1f, .86f, .48f, 1f);
-        [SerializeField, Min(.1f)] private float pointIntensity = 5f;
-        [SerializeField, Min(1f)] private float pointRange = 14f;
+        [SerializeField] private Color lightColor = new(1f, .78f, .24f, 1f);
+        [SerializeField, Range(2000f, 6500f)] private float colorTemperature = 3600f;
+        [SerializeField, Min(.1f)] private float pointIntensity = 7f;
+        [SerializeField, Min(1f)] private float pointRange = 16f;
+        [SerializeField, Range(0f, .2f)] private float beaconPulseAmount = .06f;
+        [SerializeField, Min(.05f)] private float beaconPulseFrequency = .65f;
         [Header("Rotating beam")]
         [SerializeField, Min(1f)] private float rotationDegreesPerSecond = 12f;
         [SerializeField, Range(5f, 45f)] private float spotAngle = 17f;
         [SerializeField, Min(1f)] private float beamRange = 45f;
-        [SerializeField, Min(.1f)] private float beamIntensity = 11f;
+        [SerializeField, Min(.1f)] private float beamIntensity = 13f;
         private Transform pivot, halo;
+        private Light pointLight;
+        private Vector3 haloBaseScale;
 
         public static void ConfigureScene(Scene scene)
         {
@@ -33,20 +38,26 @@ namespace GameJamOcean.World
         private void Awake()
         {
             var source = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            source.name = "Beacon Glow"; source.transform.SetParent(transform, false); source.transform.localScale = Vector3.one * .45f;
+            source.name = "Beacon Glow"; source.transform.SetParent(transform, false); source.transform.localScale = Vector3.one * .52f;
             Destroy(source.GetComponent<Collider>());
-            source.GetComponent<Renderer>().material = GlowMaterial(lightColor, 1f);
+            Color hotCore = Color.Lerp(lightColor, Color.white, .58f);
+            source.GetComponent<Renderer>().material = GlowMaterial(hotCore, 1f, 5f);
 
             Vector3 inverseScale = new(1f / Mathf.Max(.001f, transform.lossyScale.x),
                 1f / Mathf.Max(.001f, transform.lossyScale.y), 1f / Mathf.Max(.001f, transform.lossyScale.z));
             halo = GameObject.CreatePrimitive(PrimitiveType.Sphere).transform;
             halo.name = "Spherical Soft Halo"; halo.SetParent(transform, false);
-            halo.localScale = Vector3.Scale(Vector3.one * 1.3f, inverseScale);
+            haloBaseScale = Vector3.Scale(Vector3.one * 1.55f, inverseScale);
+            halo.localScale = haloBaseScale;
             Destroy(halo.GetComponent<Collider>());
-            halo.GetComponent<Renderer>().material = GlowMaterial(new Color(lightColor.r, lightColor.g, lightColor.b, .22f), .22f);
+            halo.GetComponent<Renderer>().material = GlowMaterial(
+                new Color(lightColor.r, lightColor.g * .92f, lightColor.b * .55f, .3f), .3f, 3.2f);
 
-            Light point = gameObject.AddComponent<Light>(); point.type = LightType.Point; point.color = lightColor;
-            point.intensity = pointIntensity; point.range = pointRange; point.shadows = LightShadows.None;
+            pointLight = gameObject.AddComponent<Light>();
+            pointLight.type = LightType.Point; pointLight.color = lightColor;
+            pointLight.useColorTemperature = true; pointLight.colorTemperature = colorTemperature;
+            pointLight.intensity = pointIntensity; pointLight.range = pointRange;
+            pointLight.shadows = LightShadows.None;
 
             pivot = new GameObject("Rotating Lighthouse Beam").transform; pivot.SetParent(transform, false);
             var spotObject = new GameObject("Spot Light"); spotObject.transform.SetParent(pivot, false);
@@ -54,6 +65,7 @@ namespace GameJamOcean.World
             spotObject.transform.localPosition = Vector3.zero;
             spotObject.transform.localRotation = Quaternion.Euler(42f, 0f, 0f);
             Light spot = spotObject.AddComponent<Light>(); spot.type = LightType.Spot; spot.color = lightColor;
+            spot.useColorTemperature = true; spot.colorTemperature = colorTemperature;
             spot.range = beamRange; spot.spotAngle = spotAngle; spot.innerSpotAngle = spotAngle * .35f;
             spot.intensity = beamIntensity; spot.shadows = LightShadows.Soft;
 
@@ -62,19 +74,26 @@ namespace GameJamOcean.World
             cone.transform.localScale = inverseScale;
             cone.GetComponent<MeshFilter>().sharedMesh = CreateCone(beamRange * .75f,
                 Mathf.Tan(spotAngle * .5f * Mathf.Deg2Rad) * beamRange * .75f);
-            cone.GetComponent<MeshRenderer>().material = GlowMaterial(new Color(lightColor.r, lightColor.g, lightColor.b, .075f), .075f);
+            cone.GetComponent<MeshRenderer>().material = GlowMaterial(
+                new Color(lightColor.r, lightColor.g, lightColor.b, .1f), .1f, 3f);
         }
 
         private void Update()
         {
             if (pivot != null) pivot.Rotate(0f, rotationDegreesPerSecond * Time.deltaTime, 0f, Space.Self);
+            float pulse = (Mathf.Sin(Time.time * beaconPulseFrequency * Mathf.PI * 2f) + 1f) * .5f;
+            if (pointLight != null)
+                pointLight.intensity = pointIntensity * (1f + pulse * beaconPulseAmount);
+            if (halo != null)
+                halo.localScale = haloBaseScale * (1f + pulse * beaconPulseAmount * .5f);
         }
 
-        private static Material GlowMaterial(Color color, float alpha)
+        private static Material GlowMaterial(Color color, float alpha, float emissionStrength)
         {
             Shader shader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");
             var material = new Material(shader) { color = new Color(color.r, color.g, color.b, alpha) };
-            material.SetColor("_BaseColor", material.color); material.SetColor("_EmissionColor", color * 2f);
+            material.SetColor("_BaseColor", material.color);
+            material.SetColor("_EmissionColor", color * Mathf.Max(1f, emissionStrength));
             material.SetFloat("_Surface", 1f); material.SetFloat("_Blend", 1f); material.SetFloat("_Cull", 0f);
             material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
             material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.One);

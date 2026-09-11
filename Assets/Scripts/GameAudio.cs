@@ -1,4 +1,5 @@
 using System.Collections;
+using GameJamOcean.Localization;
 using UnityEngine;
 
 namespace GameJamOcean.Audio
@@ -7,7 +8,7 @@ namespace GameJamOcean.Audio
     {
         private OceanAudioSettings settings;
         private AudioSource ambience, sceneMusic, effects, uiEffects, uiClickEffects, randomAmbience,
-            engine, boatTurbo, divePauseAmbience, coinCounting, coinCountingBoost;
+            engine, boatTurbo, divePauseAmbience, coinCounting, coinCountingBoost, letterNarration;
         public static GameAudio Instance { get; private set; }
         private Coroutine randomSounds;
         private Coroutine letterSounds;
@@ -20,6 +21,7 @@ namespace GameJamOcean.Audio
         private Coroutine boatTurboFade;
         private Coroutine sceneMusicFade;
         private float sceneMusicFadeMultiplier = 1f;
+        private float letterNarrationVolumeScale = 1f;
         public float BackgroundVolume { get; private set; }
         public float EffectsVolume { get; private set; }
         public float PanelOpenDuration => settings != null && settings.panelOpen != null
@@ -41,6 +43,7 @@ namespace GameJamOcean.Audio
             divePauseAmbience = gameObject.AddComponent<AudioSource>();
             coinCounting = gameObject.AddComponent<AudioSource>();
             coinCountingBoost = gameObject.AddComponent<AudioSource>();
+            letterNarration = gameObject.AddComponent<AudioSource>();
             uiEffects.playOnAwake = uiClickEffects.playOnAwake = randomAmbience.playOnAwake = false;
             uiEffects.spatialBlend = uiClickEffects.spatialBlend = randomAmbience.spatialBlend = 0f;
             ambience.playOnAwake = effects.playOnAwake = false;
@@ -64,6 +67,10 @@ namespace GameJamOcean.Audio
             coinCountingBoost.loop = false;
             coinCountingBoost.playOnAwake = false;
             coinCountingBoost.spatialBlend = 0f;
+            letterNarration.loop = false;
+            letterNarration.playOnAwake = false;
+            letterNarration.spatialBlend = 0f;
+            letterNarration.ignoreListenerPause = true;
             ambience.spatialBlend = effects.spatialBlend = 0f;
             uiEffects.ignoreListenerPause = true; // Only letters bypass pause, never combat audio.
             uiClickEffects.ignoreListenerPause = true;
@@ -103,6 +110,7 @@ namespace GameJamOcean.Audio
             uiEffects.volume = EffectsVolume;
             uiClickEffects.volume = EffectsVolume;
             RefreshCoinCountingVolume();
+            RefreshLetterNarrationVolume();
             RefreshEngineVolume();
             RefreshBoatTurboVolume();
             if (divePauseAmbience != null && divePauseAmbience.isPlaying && settings != null)
@@ -117,6 +125,7 @@ namespace GameJamOcean.Audio
             effects.Stop();
             coinCounting.Stop();
             coinCountingBoost.Stop();
+            letterNarration.Stop();
             StopBoatTurboImmediately();
             SetDivePauseAmbience(false);
             if (scene != "OceanScene_3D") StopBoatEngine();
@@ -190,6 +199,8 @@ namespace GameJamOcean.Audio
         }
         public void PlayCoinCollected() => PlayEffect(settings?.coinCollected,
             settings != null ? settings.coinCollectedVolume : 1f);
+        public void PlayCheatActivated() => PlayEffect(settings?.coinCounting,
+            settings != null ? settings.coinCountingVolume : 1f);
         public void StartCoinCounting()
         {
             if (settings == null || coinCounting == null || settings.coinCounting == null) return;
@@ -377,13 +388,51 @@ namespace GameJamOcean.Audio
             StopLetter();
             letterSounds = StartCoroutine(LetterSequence());
         }
-        private IEnumerator LetterSequence()
+        public void StartCampaignIntro(GameLanguage language)
+        {
+            AudioClip clip = language == GameLanguage.English
+                ? settings?.introLetterEnglish : settings?.introLetterPortuguese;
+            StartNarratedLetter(clip, settings != null ? settings.introLetterNarrationVolume : 1f);
+        }
+        public void StartFirstBoatRepair(GameLanguage language)
+        {
+            AudioClip clip = language == GameLanguage.English
+                ? settings?.firstBoatRepairEnglish : settings?.firstBoatRepairPortuguese;
+            StartNarratedLetter(clip, settings != null ? settings.firstBoatRepairNarrationVolume : 1f);
+        }
+        public void PlayEndGameCongratulations(GameLanguage language)
+        {
+            StopLetter();
+            AudioClip clip = language == GameLanguage.English
+                ? settings?.endGameCongratulationsEnglish
+                : settings?.endGameCongratulationsPortuguese;
+            if (clip == null || letterNarration == null) return;
+            letterNarrationVolumeScale = settings != null
+                ? settings.endGameCongratulationsNarrationVolume : 1f;
+            letterNarration.clip = clip;
+            letterNarration.loop = false;
+            RefreshLetterNarrationVolume();
+            letterNarration.Play();
+        }
+        private void StartNarratedLetter(AudioClip narrationClip, float volumeScale)
+        {
+            StopLetter();
+            letterNarrationVolumeScale = Mathf.Max(0f, volumeScale);
+            letterSounds = StartCoroutine(LetterSequence(narrationClip));
+        }
+        private IEnumerator LetterSequence(AudioClip narrationClip = null)
         {
             if (settings == null) yield break;
             if (settings.panelOpen != null)
             {
                 uiEffects.PlayOneShot(settings.panelOpen);
                 yield return new WaitForSecondsRealtime(settings.panelOpen.length);
+            }
+            if (narrationClip != null && letterNarration != null)
+            {
+                letterNarration.clip = narrationClip;
+                RefreshLetterNarrationVolume();
+                letterNarration.Play();
             }
             for (int i = 0; i < 2; i++)
             {
@@ -393,11 +442,21 @@ namespace GameJamOcean.Audio
             }
             letterSounds = null;
         }
+        private void RefreshLetterNarrationVolume()
+        {
+            if (letterNarration == null) return;
+            letterNarration.volume = EffectsVolume * letterNarrationVolumeScale;
+        }
         public void StopLetter()
         {
             if (letterSounds != null) StopCoroutine(letterSounds);
             letterSounds = null;
             if (uiEffects != null) uiEffects.Stop();
+            if (letterNarration != null)
+            {
+                letterNarration.Stop();
+                letterNarration.clip = null;
+            }
         }
     }
 }

@@ -28,7 +28,6 @@ namespace GameJamOcean.Rewards
     {
         [Header("Chest")]
         [SerializeField] private ChestRewardType chestType = ChestRewardType.Small;
-        [SerializeField] private string prompt = "Abrir baú";
         [SerializeField, Min(0)] private int minimumGold = 1;
         [SerializeField, Min(0)] private int maximumGold = 3;
 

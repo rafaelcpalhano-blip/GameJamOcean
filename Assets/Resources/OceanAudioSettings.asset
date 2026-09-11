@@ -34,6 +34,15 @@ MonoBehaviour:
   diveMusicVolume: 0.1
   panelOpen: {fileID: 8300000, guid: a04180208ff43074fa72f42f8e61983b, type: 3}
   writing: {fileID: 8300000, guid: 7bdec05c3629e5b48a26af04aca74b55, type: 3}
+  introLetterPortuguese: {fileID: 8300000, guid: 2876cf7da3c348c58c2e17be83de9cd2, type: 3}
+  introLetterEnglish: {fileID: 8300000, guid: 880e2a4703e64bf3a4d5565c81bb6184, type: 3}
+  introLetterNarrationVolume: 1
+  firstBoatRepairPortuguese: {fileID: 8300000, guid: ab8db84665074676a7619c92d5197c31, type: 3}
+  firstBoatRepairEnglish: {fileID: 8300000, guid: b64d47d249e340349ac349a5839e75fa, type: 3}
+  firstBoatRepairNarrationVolume: 1
+  endGameCongratulationsPortuguese: {fileID: 8300000, guid: c5a97b3a65544ab1a47c8908ae675a6d, type: 3}
+  endGameCongratulationsEnglish: {fileID: 8300000, guid: 9a9e6d082d8f48fdaed97d7ff9828b23, type: 3}
+  endGameCongratulationsNarrationVolume: 1
   harpoonShot: {fileID: 8300000, guid: 2be5e56fb0c99144484b0d79a21e6d18, type: 3}
   diveAmbience: {fileID: 8300000, guid: 228851c69bfdfb6479768d9755fff634, type: 3}
   diveRandomAmbience: {fileID: 8300000, guid: 35a56db5f356630449b845c2085977c6, type: 3}

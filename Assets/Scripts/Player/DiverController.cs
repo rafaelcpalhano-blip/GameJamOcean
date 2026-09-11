@@ -28,6 +28,14 @@ namespace GameJamOcean.Player
         [Header("Damage Feedback")]
         [SerializeField, Min(0.1f)] private float hitImmunitySeconds = 1.5f;
         [SerializeField, Min(1)] private int hitBlinks = 3;
+        [Tooltip("Color applied to the diver while the damage blink is active.")]
+        [SerializeField] private Color hitTintColor = new(1f, 0.12f, 0.12f, 1f);
+        [Tooltip("How strongly the damage color is blended over the original sprite color.")]
+        [SerializeField, Range(0f, 1f)] private float hitTintStrength = 0.72f;
+        [Tooltip("Lowest alpha reached by the diver during each damage pulse.")]
+        [SerializeField, Range(0.05f, 1f)] private float hitBlinkMinimumAlpha = 0.35f;
+        [Tooltip("Shader that forces a solid damage-colored silhouette, independent of the diver material.")]
+        [SerializeField] private Shader hitTintShader;
         [SerializeField] private AudioClip damageSound;
         [SerializeField, Range(0f, 2f)] private float damageSoundVolume = 1f;
         [Header("Dash (Shift)")]
@@ -41,6 +49,10 @@ namespace GameJamOcean.Player
         [SerializeField, Min(0.1f)] private float bubbleLifetime = 1.2f;
         private Health health;
         private float hitTime = float.NegativeInfinity;
+        private Color spriteColorBeforeHit = Color.white;
+        private bool hitFeedbackActive;
+        private SpriteRenderer hitTintOverlay;
+        private Material hitTintMaterial;
         private float dashUntil;
         private float nextDashTime;
         private float nextBubbleTime;
@@ -128,6 +140,9 @@ namespace GameJamOcean.Player
                 spriteRenderer = GetComponent<SpriteRenderer>();
             }
 
+            spriteColorBeforeHit = spriteRenderer.color;
+            ConfigureDamageTintOverlay();
+
             upStateHash = Animator.StringToHash($"Base Layer.{upStateName}");
             downStateHash = Animator.StringToHash($"Base Layer.{downStateName}");
             sideStateHash = Animator.StringToHash($"Base Layer.{sideStateName}");
@@ -172,7 +187,7 @@ namespace GameJamOcean.Player
                 {
                     int harpoonLevel = progress.GetLevel(UpgradeKind.Harpoon);
                     launcher.EquipHarpoon(harpoon.Tier(harpoonLevel).harpoonPrefab);
-                    launcher.SetBaseProjectileCount(harpoonLevel >= 4 ? 2 : 1);
+                    launcher.ApplyUpgradeLevel(harpoonLevel);
                 }
             }
             ChangeAnimation(downStateHash, 0f);
@@ -181,7 +196,7 @@ namespace GameJamOcean.Player
         private void OnDisable()
         {
             if (health != null) health.Damaged -= OnDamaged;
-            if (spriteRenderer != null) spriteRenderer.enabled = true;
+            RestoreDamageFeedback();
             hitTime = float.NegativeInfinity;
             dashUntil = 0f;
             moveInput = Vector2.zero;
@@ -226,7 +241,15 @@ namespace GameJamOcean.Player
 
         private void OnDamaged(Health target, GameObject source)
         {
+            if (spriteRenderer != null && !hitFeedbackActive)
+            {
+                // Preserve any color/alpha configured on the sprite instead of
+                // assuming white, so the feedback remains safe for visual variants.
+                spriteColorBeforeHit = spriteRenderer.color;
+            }
+
             hitTime = Time.time;
+            hitFeedbackActive = true;
             GameJamOcean.Audio.GameAudio.Instance?.PlayEffect(damageSound, damageSoundVolume);
             if (spriteRenderer == null) return;
             Vector3 top = spriteRenderer.bounds.center
@@ -237,9 +260,95 @@ namespace GameJamOcean.Player
 
         private void LateUpdate()
         {
+            if (spriteRenderer == null) return;
+
             float elapsed = Time.time - hitTime;
-            spriteRenderer.enabled = elapsed >= hitImmunitySeconds
-                || Mathf.FloorToInt(elapsed / hitImmunitySeconds * hitBlinks * 2) % 2 == 1;
+            if (!hitFeedbackActive || elapsed >= hitImmunitySeconds)
+            {
+                RestoreDamageFeedback();
+                return;
+            }
+
+            float normalized = Mathf.Clamp01(elapsed / hitImmunitySeconds);
+            // Start on a visible red frame so the impact is perceived immediately.
+            float pulse = 0.5f + 0.5f * Mathf.Cos(normalized * hitBlinks * Mathf.PI * 2f);
+            float blinkAlpha = Mathf.Lerp(hitBlinkMinimumAlpha, 1f, pulse);
+
+            // Never hide the sprite completely: reduced alpha creates the blink,
+            // while the red silhouette remains readable for the full hit duration.
+            spriteRenderer.enabled = true;
+            Color blinkingColor = spriteColorBeforeHit;
+            blinkingColor.a = spriteColorBeforeHit.a * blinkAlpha;
+            spriteRenderer.color = blinkingColor;
+            UpdateDamageTintOverlay(blinkAlpha);
+        }
+
+        private void RestoreDamageFeedback()
+        {
+            if (spriteRenderer == null) return;
+            spriteRenderer.enabled = true;
+            if (hitFeedbackActive) spriteRenderer.color = spriteColorBeforeHit;
+            if (hitTintOverlay != null) hitTintOverlay.enabled = false;
+            hitFeedbackActive = false;
+        }
+
+        private void ConfigureDamageTintOverlay()
+        {
+            if (spriteRenderer == null || hitTintOverlay != null) return;
+
+            Transform existing = transform.Find("DamageTintOverlay");
+            if (existing != null) hitTintOverlay = existing.GetComponent<SpriteRenderer>();
+            if (hitTintOverlay == null)
+            {
+                GameObject overlay = new("DamageTintOverlay");
+                overlay.transform.SetParent(transform, false);
+                hitTintOverlay = overlay.AddComponent<SpriteRenderer>();
+            }
+
+            Shader overlayShader = hitTintShader != null
+                ? hitTintShader
+                : Shader.Find("GameJamOcean/Diver Damage Overlay");
+            if (overlayShader != null && (hitTintMaterial == null || hitTintMaterial.shader != overlayShader))
+            {
+                if (hitTintMaterial != null) Destroy(hitTintMaterial);
+                hitTintMaterial = new Material(overlayShader)
+                {
+                    name = "Diver Damage Overlay (Runtime)",
+                    hideFlags = HideFlags.DontSave
+                };
+                hitTintOverlay.sharedMaterial = hitTintMaterial;
+            }
+
+            hitTintOverlay.enabled = false;
+        }
+
+        private void UpdateDamageTintOverlay(float blinkAlpha)
+        {
+            if (hitTintOverlay == null) ConfigureDamageTintOverlay();
+            if (hitTintOverlay == null || spriteRenderer == null) return;
+
+            // Keep the lightweight overlay synchronized with every animation frame.
+            hitTintOverlay.sprite = spriteRenderer.sprite;
+            hitTintOverlay.flipX = spriteRenderer.flipX;
+            hitTintOverlay.flipY = spriteRenderer.flipY;
+            hitTintOverlay.drawMode = spriteRenderer.drawMode;
+            hitTintOverlay.size = spriteRenderer.size;
+            hitTintOverlay.maskInteraction = spriteRenderer.maskInteraction;
+            hitTintOverlay.spriteSortPoint = spriteRenderer.spriteSortPoint;
+            hitTintOverlay.sortingLayerID = spriteRenderer.sortingLayerID;
+            hitTintOverlay.sortingOrder = spriteRenderer.sortingOrder + 1;
+
+            Color overlayColor = Color.white;
+            overlayColor.a = spriteColorBeforeHit.a * hitTintStrength
+                * Mathf.Lerp(0.72f, 1f, blinkAlpha);
+            hitTintOverlay.color = overlayColor;
+            if (hitTintMaterial != null) hitTintMaterial.SetColor("_HitColor", hitTintColor);
+            hitTintOverlay.enabled = overlayColor.a > 0.001f;
+        }
+
+        private void OnDestroy()
+        {
+            if (hitTintMaterial != null) Destroy(hitTintMaterial);
         }
 
         private void FixedUpdate()
@@ -382,6 +491,8 @@ namespace GameJamOcean.Player
             boundsPadding = Mathf.Max(0f, boundsPadding);
             hitImmunitySeconds = Mathf.Max(0.1f, hitImmunitySeconds);
             hitBlinks = Mathf.Max(1, hitBlinks);
+            hitTintStrength = Mathf.Clamp01(hitTintStrength);
+            hitBlinkMinimumAlpha = Mathf.Clamp(hitBlinkMinimumAlpha, 0.05f, 1f);
             dashDuration = Mathf.Max(0.05f, dashDuration);
             dashCooldown = Mathf.Max(dashDuration, dashCooldown);
             dashSpeedMultiplier = Mathf.Max(1f, dashSpeedMultiplier);

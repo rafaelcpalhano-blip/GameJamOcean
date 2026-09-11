@@ -1,5 +1,8 @@
+using System.Collections;
+using GameJamOcean.Combat;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 
 namespace GameJamOcean.Boat
 {
@@ -521,6 +524,168 @@ namespace GameJamOcean.Boat
             maximumCollisionRecoilSpeed = Mathf.Max(0f, maximumCollisionRecoilSpeed);
             collisionTangentialRetention = Mathf.Clamp01(collisionTangentialRetention);
             collisionSlideAssistDuration = Mathf.Max(0f, collisionSlideAssistDuration);
+        }
+    }
+
+    // Deliberately installed only in the ocean navigation scene. Codes are accepted
+    // only during unobstructed boat control and never while a panel owns the input.
+    internal sealed class OceanNavigationCheat3D : MonoBehaviour
+    {
+        private const string OceanScene = "OceanScene_3D";
+        private const string RepairCode = "hesoyam";
+        private const string GoldCode = "twenty";
+        private const int GoldReward = 20000;
+        private const float EntryWindowSeconds = 3f;
+        private const float RepairDurationSeconds = 1.75f;
+
+        private int repairMatchedCharacters;
+        private int goldMatchedCharacters;
+        private float repairEntryStartedAt;
+        private float goldEntryStartedAt;
+        private Coroutine repairRoutine;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void RegisterSceneHook()
+        {
+            SceneManager.sceneLoaded -= InstallForScene;
+            SceneManager.sceneLoaded += InstallForScene;
+        }
+
+        private static void InstallForScene(Scene scene, LoadSceneMode mode)
+        {
+            if (scene.name != OceanScene
+                || FindFirstObjectByType<OceanNavigationCheat3D>() != null)
+                return;
+
+            new GameObject("Ocean Navigation Cheat").AddComponent<OceanNavigationCheat3D>();
+        }
+
+        private void Update()
+        {
+            BoatStats3D stats = FindFirstObjectByType<BoatStats3D>();
+            BoatController3D controller = stats != null ? stats.GetComponent<BoatController3D>() : null;
+            if (SceneManager.GetActiveScene().name != OceanScene
+                || GameJamOcean.UI.GameMenus.BlocksGameplay
+                || stats == null || !stats.isActiveAndEnabled
+                || controller == null || !controller.enabled)
+            {
+                ResetEntry();
+                return;
+            }
+
+            Keyboard keyboard = Keyboard.current;
+            if (keyboard == null) return;
+            ResetExpiredEntry(ref repairMatchedCharacters, ref repairEntryStartedAt);
+            ResetExpiredEntry(ref goldMatchedCharacters, ref goldEntryStartedAt);
+            if (!keyboard.anyKey.wasPressedThisFrame) return;
+
+            char character = ReadRelevantLetter(keyboard);
+            if (AdvanceCode(character, RepairCode,
+                    ref repairMatchedCharacters, ref repairEntryStartedAt))
+            {
+                ActivateRepair(stats);
+                repairMatchedCharacters = 0;
+                repairEntryStartedAt = 0f;
+            }
+            if (AdvanceCode(character, GoldCode,
+                    ref goldMatchedCharacters, ref goldEntryStartedAt))
+            {
+                ActivateGoldReward();
+                goldMatchedCharacters = 0;
+                goldEntryStartedAt = 0f;
+            }
+        }
+
+        private static bool AdvanceCode(char character, string code,
+            ref int matchedCharacters, ref float entryStartedAt)
+        {
+            if (character == code[matchedCharacters])
+            {
+                if (matchedCharacters == 0) entryStartedAt = Time.unscaledTime;
+                matchedCharacters++;
+                return matchedCharacters == code.Length;
+            }
+
+            matchedCharacters = character == code[0] ? 1 : 0;
+            entryStartedAt = matchedCharacters == 1 ? Time.unscaledTime : 0f;
+            return false;
+        }
+
+        private static void ResetExpiredEntry(ref int matchedCharacters, ref float entryStartedAt)
+        {
+            if (matchedCharacters == 0
+                || Time.unscaledTime - entryStartedAt <= EntryWindowSeconds) return;
+            matchedCharacters = 0;
+            entryStartedAt = 0f;
+        }
+
+        private void ActivateRepair(BoatStats3D stats)
+        {
+            GameJamOcean.Audio.GameAudio.Instance?.PlayCheatActivated();
+            Health health = stats.Health;
+            if (health == null || health.IsDead
+                || health.CurrentHealth >= health.MaximumHealth) return;
+
+            if (repairRoutine != null) StopCoroutine(repairRoutine);
+            repairRoutine = StartCoroutine(RepairGradually(stats, health));
+        }
+
+        private static void ActivateGoldReward()
+        {
+            GameJamOcean.Audio.GameAudio.Instance?.PlayCheatActivated();
+            GameJamOcean.Progression.GameProgress progress =
+                GameJamOcean.Progression.GameProgress.Instance;
+            if (progress == null || !progress.HasValidCampaign) return;
+            progress.AddGold(GoldReward);
+        }
+
+        private IEnumerator RepairGradually(BoatStats3D stats, Health health)
+        {
+            float startingHealth = health.CurrentHealth;
+            float elapsed = 0f;
+            while (health != null && !health.IsDead && elapsed < RepairDurationSeconds)
+            {
+                if (GameJamOcean.UI.GameMenus.BlocksGameplay)
+                {
+                    yield return null;
+                    continue;
+                }
+
+                elapsed += Time.deltaTime;
+                float progress = Mathf.Clamp01(elapsed / RepairDurationSeconds);
+                float smoothProgress = progress * progress * (3f - 2f * progress);
+                health.SetCurrentHealth(Mathf.Lerp(startingHealth,
+                    health.MaximumHealth, smoothProgress));
+                yield return null;
+            }
+
+            if (health != null && !health.IsDead)
+            {
+                health.SetCurrentHealth(health.MaximumHealth);
+                stats?.SaveCurrentBoatHealth();
+            }
+            repairRoutine = null;
+        }
+
+        private static char ReadRelevantLetter(Keyboard keyboard)
+        {
+            if (keyboard.hKey.wasPressedThisFrame) return 'h';
+            if (keyboard.eKey.wasPressedThisFrame) return 'e';
+            if (keyboard.sKey.wasPressedThisFrame) return 's';
+            if (keyboard.oKey.wasPressedThisFrame) return 'o';
+            if (keyboard.yKey.wasPressedThisFrame) return 'y';
+            if (keyboard.aKey.wasPressedThisFrame) return 'a';
+            if (keyboard.mKey.wasPressedThisFrame) return 'm';
+            if (keyboard.tKey.wasPressedThisFrame) return 't';
+            if (keyboard.wKey.wasPressedThisFrame) return 'w';
+            if (keyboard.nKey.wasPressedThisFrame) return 'n';
+            return '\0';
+        }
+
+        private void ResetEntry()
+        {
+            repairMatchedCharacters = goldMatchedCharacters = 0;
+            repairEntryStartedAt = goldEntryStartedAt = 0f;
         }
     }
 }

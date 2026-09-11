@@ -44,6 +44,18 @@ namespace GameJamOcean.Audio
         [Range(0f, 1f)] public float diveMusicVolume = .5f;
         public AudioClip panelOpen;
         public AudioClip writing;
+        [Header("Campaign Introduction Narration")]
+        public AudioClip introLetterPortuguese;
+        public AudioClip introLetterEnglish;
+        [Range(0f, 2f)] public float introLetterNarrationVolume = 1f;
+        [Header("First Boat Repair Narration")]
+        public AudioClip firstBoatRepairPortuguese;
+        public AudioClip firstBoatRepairEnglish;
+        [Range(0f, 2f)] public float firstBoatRepairNarrationVolume = 1f;
+        [Header("End Game Congratulations Narration")]
+        public AudioClip endGameCongratulationsPortuguese;
+        public AudioClip endGameCongratulationsEnglish;
+        [Range(0f, 2f)] public float endGameCongratulationsNarrationVolume = 1f;
         [Header("Diving")]
         public AudioClip harpoonShot;
         public AudioClip diveAmbience;

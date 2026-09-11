@@ -26,12 +26,15 @@ namespace GameJamOcean.Weapons
         [SerializeField, Min(0f)] private float fallbackSpawnDistance = 0.35f;
         [SerializeField] private LayerMask blockedPointerLayers;
         [SerializeField, Min(1)] private int baseProjectileCount = 1;
+        [Tooltip("Flight speed applied only to the permanent level 4 double harpoon.")]
+        [SerializeField, Range(0.1f, 1f)] private float level4FlightSpeedMultiplier = 0.8f;
 
         private bool enabledAttackAction;
         private float nextFireTime;
         private float doubleShotUntil;
         private float doubleShotAngle = 18f;
         private float doubleShotDuration;
+        private float projectileSpeedMultiplier = 1f;
         public float DoubleShotRemaining => Mathf.Max(0f, doubleShotUntil - Time.time);
         public float DoubleShotNormalized => doubleShotDuration > 0f
             ? Mathf.Clamp01(DoubleShotRemaining / doubleShotDuration) : 0f;
@@ -94,6 +97,13 @@ namespace GameJamOcean.Weapons
 
         public void SetBaseProjectileCount(int count) => baseProjectileCount = Mathf.Clamp(count, 1, 2);
 
+        public void ApplyUpgradeLevel(int level)
+        {
+            bool permanentDoubleShot = level >= 4;
+            baseProjectileCount = permanentDoubleShot ? 2 : 1;
+            projectileSpeedMultiplier = permanentDoubleShot ? level4FlightSpeedMultiplier : 1f;
+        }
+
         private void TryFire()
         {
             if (GameJamOcean.UI.GameMenus.BlocksGameplay) return;
@@ -143,7 +153,7 @@ namespace GameJamOcean.Weapons
         private void LaunchHarpoon(Vector2 direction, Vector2 spawnPosition)
         {
             HarpoonProjectile2D harpoon = Instantiate(harpoonPrefab, spawnPosition, Quaternion.identity);
-            harpoon.Launch(direction, gameObject);
+            harpoon.Launch(direction, gameObject, projectileSpeedMultiplier);
             HarpoonFired?.Invoke(spawnPosition, direction);
         }
 
@@ -161,6 +171,7 @@ namespace GameJamOcean.Weapons
             fireCooldown = Mathf.Max(0.01f, fireCooldown);
             fallbackSpawnDistance = Mathf.Max(0f, fallbackSpawnDistance);
             baseProjectileCount = Mathf.Clamp(baseProjectileCount, 1, 2);
+            level4FlightSpeedMultiplier = Mathf.Clamp(level4FlightSpeedMultiplier, 0.1f, 1f);
         }
     }
 }

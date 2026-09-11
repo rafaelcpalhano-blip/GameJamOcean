@@ -50,6 +50,8 @@ namespace GameJamOcean.Progression
                 }
             }
             cameraFollow?.BeginEndGameOrbit(center);
+            GameJamOcean.Audio.GameAudio.Instance?.PlayEndGameCongratulations(
+                LocalizationManager.CurrentLanguage);
             StartCoroutine(Sequence());
         }
 

@@ -313,9 +313,10 @@ namespace GameJamOcean.EditorTools
             mainCamera.orthographic = false;
             mainCamera.fieldOfView = 50f;
             CameraFollow3D follow = GetOrAddComponent<CameraFollow3D>(mainCamera.gameObject);
-            follow.Configure(boat, new Vector3(0f, 12f, -10f));
-            mainCamera.transform.position = boat.position + new Vector3(0f, 12f, -10f);
-            mainCamera.transform.LookAt(boat.position + Vector3.up * 0.5f);
+            Vector3 followOffset = new(0f, 10.7f, -11.38f);
+            follow.Configure(boat, followOffset);
+            mainCamera.transform.position = boat.position + followOffset;
+            mainCamera.transform.LookAt(boat.position + Vector3.up * 4f);
             return mainCamera;
         }
 

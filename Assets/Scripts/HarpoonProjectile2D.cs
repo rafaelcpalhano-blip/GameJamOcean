@@ -52,7 +52,7 @@ namespace GameJamOcean.Weapons
             for (int i = 0; i < visuals.Length; i++) originalColors[i] = visuals[i].color;
         }
 
-        public void Launch(Vector2 direction, GameObject projectileOwner)
+        public void Launch(Vector2 direction, GameObject projectileOwner, float runtimeSpeedMultiplier = 1f)
         {
             if (direction.sqrMagnitude <= Mathf.Epsilon)
             {
@@ -62,7 +62,8 @@ namespace GameJamOcean.Weapons
             direction.Normalize();
             owner = projectileOwner;
             transform.up = direction;
-            projectileRigidbody.linearVelocity = direction * speed * flightSpeedMultiplier;
+            projectileRigidbody.linearVelocity = direction * speed * flightSpeedMultiplier
+                * Mathf.Max(0f, runtimeSpeedMultiplier);
 
             IgnoreOwnerColliders();
             destroyAt = Time.time + lifetime;
