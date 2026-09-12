@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using GameJamOcean.Localization;
+using GameJamOcean.Flow;
 
 namespace GameJamOcean.Interaction
 {
@@ -47,7 +48,7 @@ namespace GameJamOcean.Interaction
             }
 
             isLoading = true;
-            SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Single);
+            SceneTransition.LoadScene(sceneName);
         }
 
         public void SetAvailable(bool value)

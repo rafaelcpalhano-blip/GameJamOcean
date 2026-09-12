@@ -2,6 +2,7 @@ using System.Collections;
 using GameJamOcean.Boat;
 using GameJamOcean.Spawning;
 using GameJamOcean.Localization;
+using GameJamOcean.Flow;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -82,7 +83,7 @@ namespace GameJamOcean.Interaction
             audio?.PlayDiverWaterJump();
             float duration = audio != null ? audio.DiverWaterJumpDuration : 0f;
             if (duration > 0f) yield return new WaitForSecondsRealtime(duration);
-            SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Single);
+            SceneTransition.LoadScene(sceneName);
         }
     }
 }

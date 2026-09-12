@@ -166,7 +166,7 @@ namespace GameJamOcean.Flow
             UnityEditor.Selection.activeObject = null;
 #endif
 
-            SceneManager.LoadScene(oceanSceneName);
+            SceneTransition.LoadScene(oceanSceneName);
         }
 
         private void DisablePlayerControl()

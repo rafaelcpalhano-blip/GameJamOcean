@@ -31,7 +31,9 @@ namespace GameJamOcean.UI
         private static int resumeFrame = -1;
         public static bool BoatRecoveryActive { get; set; }
         public static bool EndGameActive { get; set; }
-        public static bool BlocksGameplay => BoatRecoveryActive || EndGameActive || Time.timeScale <= 0f || (instance != null && instance.open) || Time.frameCount == resumeFrame;
+        public static bool BlocksGameplay => BoatRecoveryActive || EndGameActive
+            || SceneTransition.IsTransitioning || Time.timeScale <= 0f
+            || (instance != null && instance.open) || Time.frameCount == resumeFrame;
         public static float SteeringMultiplier { get; private set; } = 1f;
         private bool firstScene = true, requestMain, main, open, loading;
         private bool requestIntro, transitioning;
@@ -552,7 +554,9 @@ namespace GameJamOcean.UI
             InteractionDiscoveryStore.ResetAll();
             DivePointSpawnManager3D.ResetRuntimeState();
             requestIntro = true;
-            Travel(false);
+            // Starting a newly confirmed campaign intentionally cuts directly to the
+            // introduction. Every other travel route keeps the shared scene fade.
+            Travel(false, false);
         }
 
         private void ConfirmTravel(bool toMain)
@@ -581,7 +585,7 @@ namespace GameJamOcean.UI
             return false;
         }
 
-        private void Travel(bool toMain)
+        private void Travel(bool toMain, bool useFade = true)
         {
             if (loading || !CanLoadOcean()) return;
             FindFirstObjectByType<DiveSessionFlowController>()?.CommitAbandonedSession();
@@ -591,7 +595,8 @@ namespace GameJamOcean.UI
             requestMain = toMain;
             loading = true;
             Resume();
-            SceneManager.LoadScene(Ocean);
+            if (useFade) SceneTransition.LoadScene(Ocean);
+            else SceneManager.LoadScene(Ocean, LoadSceneMode.Single);
         }
 
         private void ShowSettings()
@@ -682,7 +687,7 @@ namespace GameJamOcean.UI
                 typeof(CanvasRenderer), typeof(Image)).GetComponent<RectTransform>();
             languageTooltipRect.SetParent(canvas.transform, false);
             languageTooltipRect.anchorMin = languageTooltipRect.anchorMax =
-                languageTooltipRect.pivot = Vector2.zero;
+                languageTooltipRect.pivot = new Vector2(.5f, .5f);
             languageTooltipRect.sizeDelta = new Vector2(145f, 38f);
             languageTooltipRect.gameObject.GetComponent<Image>().color = new Color(.015f, .07f, .1f, .94f);
             RectTransform labelRect = new GameObject("Label", typeof(RectTransform),
@@ -706,10 +711,20 @@ namespace GameJamOcean.UI
         private void UpdateLanguageTooltipPosition()
         {
             if (languageTooltipRect == null || Mouse.current == null) return;
-            Vector2 pointer = Mouse.current.position.ReadValue() + new Vector2(18f, -48f);
+            if (canvas == null || canvas.transform is not RectTransform canvasRect) return;
+
+            Camera eventCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay
+                ? null : canvas.worldCamera;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect,
+                    Mouse.current.position.ReadValue(), eventCamera, out Vector2 pointer)) return;
+
             Vector2 half = languageTooltipRect.sizeDelta * .5f;
-            pointer.x = Mathf.Clamp(pointer.x, 8f, Screen.width - languageTooltipRect.sizeDelta.x - 8f);
-            pointer.y = Mathf.Clamp(pointer.y, 8f, Screen.height - languageTooltipRect.sizeDelta.y - 8f);
+            pointer += new Vector2(half.x + 18f, -half.y - 10f);
+            Rect bounds = canvasRect.rect;
+            pointer.x = Mathf.Clamp(pointer.x, bounds.xMin + half.x + 8f,
+                bounds.xMax - half.x - 8f);
+            pointer.y = Mathf.Clamp(pointer.y, bounds.yMin + half.y + 8f,
+                bounds.yMax - half.y - 8f);
             languageTooltipRect.anchoredPosition = pointer;
         }
 
