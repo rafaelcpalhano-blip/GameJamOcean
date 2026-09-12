@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+    <title>{{{ PRODUCT_NAME }}}</title>
+    <style>
+      html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: #000;
+      }
+
+      #unity-container {
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      #unity-canvas {
+        display: block;
+        width: 100vw !important;
+        height: 100vh !important;
+        background: {{{ BACKGROUND_COLOR }}};
+      }
+
+      #unity-loading-bar {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: min(320px, 70vw);
+        transform: translate(-50%, -50%);
+        color: white;
+        font: 600 16px Arial, sans-serif;
+        text-align: center;
+      }
+
+      #unity-progress-track {
+        height: 12px;
+        margin-top: 14px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, .75);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, .15);
+      }
+
+      #unity-progress-bar {
+        width: 0;
+        height: 100%;
+        background: #5bd5ec;
+        transition: width .12s linear;
+      }
+
+      #unity-fullscreen-button {
+        position: fixed;
+        right: 14px;
+        bottom: 14px;
+        z-index: 5;
+        width: 42px;
+        height: 42px;
+        border: 1px solid rgba(255, 255, 255, .8);
+        border-radius: 5px;
+        background: rgba(0, 161, 207, .9);
+        color: white;
+        font: 700 23px Arial, sans-serif;
+        cursor: pointer;
+      }
+
+      #unity-warning {
+        position: absolute;
+        left: 50%;
+        top: 4%;
+        z-index: 10;
+        max-width: 80%;
+        transform: translateX(-50%);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="unity-container">
+      <canvas id="unity-canvas" tabindex="-1"></canvas>
+      <div id="unity-loading-bar">
+        <div>Carregando...</div>
+        <div id="unity-progress-track"><div id="unity-progress-bar"></div></div>
+      </div>
+      <div id="unity-warning"></div>
+      <button id="unity-fullscreen-button" type="button" aria-label="Tela cheia">⛶</button>
+    </div>
+
+    <script>
+      const canvas = document.querySelector("#unity-canvas");
+      const loadingBar = document.querySelector("#unity-loading-bar");
+      const progressBar = document.querySelector("#unity-progress-bar");
+      const fullscreenButton = document.querySelector("#unity-fullscreen-button");
+
+      function unityShowBanner(message, type) {
+        const warning = document.querySelector("#unity-warning");
+        const item = document.createElement("div");
+        item.textContent = message;
+        item.style.cssText = "padding:10px;margin:4px;background:" +
+          (type === "error" ? "#b00020;color:white" : "#ffe66d;color:#111");
+        warning.appendChild(item);
+        if (type !== "error") setTimeout(() => item.remove(), 5000);
+      }
+
+      const buildUrl = "Build";
+      const loaderUrl = buildUrl + "/{{{ LOADER_FILENAME }}}";
+      const config = {
+        arguments: [],
+        dataUrl: buildUrl + "/{{{ DATA_FILENAME }}}",
+        frameworkUrl: buildUrl + "/{{{ FRAMEWORK_FILENAME }}}",
+#if USE_THREADS
+        workerUrl: buildUrl + "/{{{ WORKER_FILENAME }}}",
+#endif
+#if USE_WASM
+        codeUrl: buildUrl + "/{{{ CODE_FILENAME }}}",
+#endif
+#if SYMBOLS_FILENAME
+        symbolsUrl: buildUrl + "/{{{ SYMBOLS_FILENAME }}}",
+#endif
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: {{{ JSON.stringify(COMPANY_NAME) }}},
+        productName: {{{ JSON.stringify(PRODUCT_NAME) }}},
+        productVersion: {{{ JSON.stringify(PRODUCT_VERSION) }}},
+        showBanner: unityShowBanner
+      };
+
+#if BACKGROUND_FILENAME
+      canvas.style.background = "url('" + buildUrl + "/{{{ BACKGROUND_FILENAME.replace(/'/g, '%27') }}}') center / cover";
+#endif
+
+      const loader = document.createElement("script");
+      loader.src = loaderUrl;
+      loader.onload = () => {
+        createUnityInstance(canvas, config, progress => {
+          progressBar.style.width = (progress * 100) + "%";
+        }).then(unityInstance => {
+          loadingBar.style.display = "none";
+          fullscreenButton.onclick = () => unityInstance.SetFullscreen(1);
+        }).catch(message => {
+          unityShowBanner(message, "error");
+        });
+      };
+      document.body.appendChild(loader);
+    </script>
+  </body>
+</html>
