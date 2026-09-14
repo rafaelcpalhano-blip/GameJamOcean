@@ -115,13 +115,40 @@ InitTestScene*.unity*
 
 # Reference artwork kept outside version control for licensing/copyright safety
 /Artes/
+/Artes.meta
+/Artes da Unity/
+/Artes da Unity.meta
 /Assets/Artes/
 /Assets/Artes.meta
+/Assets/Artes da Unity/
+/Assets/Artes da Unity.meta
 
 # Third-party art packages kept local for licensing/copyright safety
 /Assets/2D-Ocean theme Parallax Background/
 /Assets/2D-Ocean theme Parallax Background.meta
+/Assets/Alstra Infinite/
+/Assets/Alstra Infinite.meta
+/Assets/Audio/
+/Assets/Audio.meta
+/Assets/Collectables Sound Pack/
+/Assets/Collectables Sound Pack.meta
+/Assets/Deep_In_Space/
+/Assets/Deep_In_Space.meta
+/Assets/EmaceArt/
+/Assets/EmaceArt.meta
+/Assets/Fantasy Cursor Pack/
+/Assets/Fantasy Cursor Pack.meta
+/Assets/Fantasy Skybox FREE/
+/Assets/Fantasy Skybox FREE.meta
+/Assets/Foam Textures/
+/Assets/Foam Textures.meta
 /Assets/LifeguardBuoy/
 /Assets/LifeguardBuoy.meta
 /Assets/Tiny Swords/
 /Assets/Tiny Swords.meta
+/Assets/UnrealtechnologDev AS Publisher/
+/Assets/UnrealtechnologDev AS Publisher.meta
+/Assets/Vefects/
+/Assets/Vefects.meta
+/Assets/WhatSoundsNice/
+/Assets/WhatSoundsNice.meta
